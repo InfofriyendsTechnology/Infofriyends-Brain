@@ -44,11 +44,21 @@ export default function ChatClient({
   currentUser: any 
 }) {
   const [channels, setChannels] = useState<Channel[]>(initialChannels)
-  const [activeChannel, setActiveChannel] = useState<Channel>(initialChannels[0])
+  const [activeChannel, setActiveChannel] = useState<Channel | null>(initialChannels[0] || null)
   const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [inputText, setInputText] = useState('')
   const [isSending, setIsSending] = useState(false)
   
+  // Sync channels from server when initialChannels loads/changes (prevents empty boot lag!)
+  useEffect(() => {
+    if (initialChannels && initialChannels.length > 0) {
+      setChannels(initialChannels)
+      if (!activeChannel) {
+        setActiveChannel(initialChannels[0])
+      }
+    }
+  }, [initialChannels])
+
   // Live Sync Status
   const [typingUsers, setTypingUsers] = useState<string[]>([])
   const [members, setMembers] = useState<TeamMember[]>([])

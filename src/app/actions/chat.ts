@@ -6,26 +6,31 @@ import { revalidatePath } from 'next/cache'
 
 // Ensure at least one default channel exists (self-healing seed)
 async function seedDefaultChannelIfNeeded() {
-  const count = await prisma.chatChannel.count()
-  if (count === 0) {
-    await prisma.chatChannel.create({
-      data: {
-        name: 'General HQ 💬',
-        description: 'Primary team collaboration channel for all announcements and discussions.',
-        isProject: false
-      }
-    })
+  try {
+    const count = await prisma.chatChannel.count()
+    if (count === 0) {
+      await prisma.chatChannel.create({
+        data: {
+          name: 'General HQ 💬',
+          description: 'Primary team collaboration channel for all announcements and discussions.',
+          isProject: false
+        }
+      })
+    }
+  } catch (error) {
+    console.error("Failed to seed default channel:", error)
   }
 }
 
 // Fetch all available chat channels/groups
 export async function getChatChannels() {
-  await seedDefaultChannelIfNeeded()
   try {
+    await seedDefaultChannelIfNeeded()
     return await prisma.chatChannel.findMany({
       orderBy: { createdAt: 'asc' }
     })
   } catch (e) {
+    console.error("Failed to fetch chat channels:", e)
     return []
   }
 }
