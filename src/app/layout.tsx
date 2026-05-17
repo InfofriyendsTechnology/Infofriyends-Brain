@@ -23,6 +23,9 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "Brain OS",
   },
+  icons: {
+    apple: "/icon-192.png",
+  },
 };
 
 export default async function RootLayout({
