@@ -9,6 +9,7 @@ import WorkCard from '@/components/WorkCard'
 import { Terminal, ArrowRight, FolderGit2 } from 'lucide-react'
 import Link from 'next/link'
 import { Suspense } from 'react'
+import LiveClock from '@/components/LiveClock'
 
 export const dynamic = 'force-dynamic'
 
@@ -217,14 +218,7 @@ export default async function Home() {
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Systems Operational
             </div>
-            <div className="md:text-right space-y-1 mt-1">
-              <span suppressHydrationWarning className="text-3xl md:text-4xl font-extrabold text-white tracking-tight block leading-none">
-                {new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: true })}
-              </span>
-              <span suppressHydrationWarning className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest block mt-1.5">
-                {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-              </span>
-            </div>
+            <LiveClock />
           </div>
         </div>
       </div>
