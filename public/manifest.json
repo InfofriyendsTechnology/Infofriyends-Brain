@@ -1,0 +1,17 @@
+{
+  "name": "Infofriyends Brain OS",
+  "short_name": "Brain OS",
+  "description": "Internal team operating system for Infofriyends Technology.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#63BDF2",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

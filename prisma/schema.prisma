@@ -1,0 +1,132 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+model User {
+  id                String   @id @default(cuid())
+  name              String
+  email             String?  @unique
+  mobile            String?
+  username          String   @unique
+  passwordHash      String
+  role              Role     @default(MEMBER)
+  profilePhoto      String?
+  contributionScore Int      @default(0)
+  lastActive        DateTime? @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  worksCreated      Work[]          @relation("WorkCreator")
+  worksOriginal     Work[]          @relation("WorkOriginalOwner")
+  worksEdited       Work[]          @relation("WorkEditor")
+  activityLogs      ActivityLog[]
+  communityPosts    CommunityPost[]
+  dailyUpdates      DailyUpdate[]
+  chatMessages      ChatMessage[]
+  typingStates      TypingState[]
+}
+
+model Work {
+  id              String   @id @default(cuid())
+  name            String
+  description     String   @db.Text
+  status          String   @default("Active") // Active, Completed, Archived
+  points          Int      @default(10)
+  
+  // Relations
+  creatorId       String
+  creator         User     @relation("WorkCreator", fields: [creatorId], references: [id])
+  
+  // For admin edits
+  originalOwnerId String?
+  originalOwner   User?    @relation("WorkOriginalOwner", fields: [originalOwnerId], references: [id])
+  editedByAdminId String?
+  editedByAdmin   User?    @relation("WorkEditor", fields: [editedByAdminId], references: [id])
+  editReason      String?  @db.Text
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  activityLogs    ActivityLog[]
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  action      String   // CREATED, UPDATED, ARCHIVED, STATUS_CHANGE
+  details     String?  @db.Text
+  
+  workId      String?
+  work        Work?    @relation(fields: [workId], references: [id], onDelete: SetNull)
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+}
+
+model CommunityPost {
+  id          String   @id @default(cuid())
+  content     String   @db.Text
+  type        String   // UPDATE, THOUGHT, IDEA, PROGRESS
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+}
+
+model DailyUpdate {
+  id           String   @id @default(cuid())
+  whatChanged  String   @db.Text
+  whatImproved String   @db.Text
+  whatFixed    String   @db.Text
+  
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime @default(now())
+}
+
+model ChatMessage {
+  id        String      @id @default(cuid())
+  message   String      @db.Text
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channelId String
+  channel   ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now())
+}
+
+model ChatChannel {
+  id          String        @id @default(cuid())
+  name        String
+  description String?       @db.Text
+  isProject   Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  messages    ChatMessage[]
+  typingStates TypingState[]
+}
+
+model TypingState {
+  userId    String      @id
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channelId String
+  channel   ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  updatedAt DateTime    @updatedAt
+}
