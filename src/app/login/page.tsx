@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { BrainCircuit, ShieldAlert, ArrowRight, Activity } from 'lucide-react'
+import { ShieldAlert, ArrowRight, Activity } from 'lucide-react'
 import { loginAction } from '@/app/actions/auth'
 
 export default function LoginPage() {
@@ -36,8 +36,8 @@ export default function LoginPage() {
           {/* Logo HUD Header */}
           <div className="flex flex-col items-center mb-8">
             <div className="relative mb-4 group select-none">
-              <div className="relative bg-[#14161f] border border-white/10 p-4 rounded-2xl text-[#63BDF2] flex items-center justify-center shadow-lg">
-                <BrainCircuit size={36} />
+              <div className="relative bg-[#14161f] border border-white/10 p-3 w-20 h-20 rounded-2xl flex items-center justify-center shadow-lg">
+                <img src="/IB_LOGO.png" alt="Logo" className="h-14 w-auto object-contain" />
               </div>
             </div>
             

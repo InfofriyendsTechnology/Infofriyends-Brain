@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { BrainCircuit, LayoutDashboard, Briefcase, Shield, LogOut, Plus, User, HelpCircle, MessageSquare } from 'lucide-react'
+import { LayoutDashboard, Briefcase, Shield, LogOut, Plus, User, HelpCircle, MessageSquare } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { logoutAction } from '@/app/actions/auth'
 import { useState, useEffect } from 'react'
@@ -38,11 +38,10 @@ export default function Sidebar({ session }: { session: any }) {
         <div className="p-6 border-b border-border/50">
           <Link href="/" className="flex items-center gap-3">
             <motion.div 
-              whileHover={{ rotate: 180 }}
-              transition={{ duration: 0.5, ease: "easeInOut" }}
-              className="bg-[#63BDF2]/10 p-2 rounded-xl text-[#63BDF2] shrink-0"
+              whileHover={{ scale: 1.05 }}
+              className="bg-[#63BDF2]/10 p-2 w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
             >
-              <BrainCircuit size={24} />
+              <img src="/IB_LOGO.png" alt="Logo" className="h-7 w-auto object-contain" />
             </motion.div>
             <div className="flex flex-col min-w-0">
               <span className="font-bold text-base tracking-tight leading-none bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent truncate">
