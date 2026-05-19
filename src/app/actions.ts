@@ -101,13 +101,14 @@ export async function updateWorkStatus(id: string, newStatus: string, customPoin
 
 export async function getWorks() {
   try {
-    return await prisma.work.findMany({
+    const data = await prisma.work.findMany({
       include: {
         creator: { select: { name: true, profilePhoto: true } },
         editedByAdmin: { select: { name: true } }
       },
       orderBy: { createdAt: 'desc' },
     })
+    return JSON.parse(JSON.stringify(data))
   } catch (error) {
     return []
   }
@@ -140,12 +141,13 @@ export async function createCommunityPost(formData: FormData) {
 
 export async function getCommunityPosts() {
   try {
-    return await prisma.communityPost.findMany({
+    const data = await prisma.communityPost.findMany({
       include: {
         user: { select: { name: true, role: true, profilePhoto: true } }
       },
       orderBy: { createdAt: 'desc' },
     })
+    return JSON.parse(JSON.stringify(data))
   } catch (error) {
     return []
   }

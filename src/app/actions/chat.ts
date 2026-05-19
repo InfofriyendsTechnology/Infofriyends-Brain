@@ -26,9 +26,10 @@ async function seedDefaultChannelIfNeeded() {
 export async function getChatChannels() {
   try {
     await seedDefaultChannelIfNeeded()
-    return await prisma.chatChannel.findMany({
+    const data = await prisma.chatChannel.findMany({
       orderBy: { createdAt: 'asc' }
     })
+    return JSON.parse(JSON.stringify(data))
   } catch (e) {
     console.error("Failed to fetch chat channels:", e)
     return []
@@ -115,7 +116,7 @@ export async function sendChatMessage(channelId: string, message: string) {
 // Fetch messages for a specific channel
 export async function getChannelMessages(channelId: string) {
   try {
-    return await prisma.chatMessage.findMany({
+    const data = await prisma.chatMessage.findMany({
       where: { channelId },
       include: {
         user: {
@@ -130,6 +131,7 @@ export async function getChannelMessages(channelId: string) {
       orderBy: { createdAt: 'asc' },
       take: 100, // Grab last 100 messages for rich history
     })
+    return JSON.parse(JSON.stringify(data))
   } catch (e) {
     return []
   }

@@ -41,7 +41,7 @@ export async function createMember(formData: FormData) {
 
 export async function getMembers() {
   try {
-    return await prisma.user.findMany({
+    const data = await prisma.user.findMany({
       select: {
         id: true,
         name: true,
@@ -64,6 +64,7 @@ export async function getMembers() {
       },
       orderBy: { createdAt: 'desc' }
     })
+    return JSON.parse(JSON.stringify(data))
   } catch (e) {
     return []
   }
