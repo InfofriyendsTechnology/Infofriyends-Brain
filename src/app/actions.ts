@@ -25,31 +25,49 @@ export async function createWork(formData: FormData) {
 
   const name = formData.get('name') as string
   const description = formData.get('description') as string
+  const assigneeId = formData.get('assigneeId') as string || null
+  const priority = formData.get('priority') as string || 'MEDIUM'
+  const status = formData.get('status') as string || 'IDEA'
+  const dueDateStr = formData.get('dueDate') as string
 
   if (!name || !description) return { success: false, error: 'Missing required fields' }
 
-  // Standard member works start as Pending. Admin works start as Active.
-  const defaultStatus = user.role === 'ADMIN' ? 'Active' : 'Pending'
+  let dueDate: Date | null = null
+  if (dueDateStr) {
+    try {
+      dueDate = new Date(dueDateStr)
+    } catch (e) {
+      // Ignore parse errors
+    }
+  }
 
   try {
     const work = await prisma.work.create({
       data: {
         name,
         description,
-        status: defaultStatus,
+        status,
+        priority,
+        dueDate,
         creatorId: user.id,
+        assigneeId: assigneeId || null,
+        points: 10
       },
     })
-    await logActivity('CREATED_WORK', user.id, work.id, `Created work: ${name} (Status: ${defaultStatus})`)
+    
+    // Log creation
+    await logActivity('CREATED_WORK', user.id, work.id, `Created work: "${name}" assigned to ${assigneeId ? 'member' : 'unassigned'} (Status: ${status}, Priority: ${priority})`)
+    
     revalidatePath('/')
+    revalidatePath('/works')
     return { success: true }
   } catch (error: any) {
     console.error('Failed to create work:', error)
-    return { success: false, error: `Database connection error: ${error.message || error}` }
+    return { success: false, error: `Database error: ${error.message || error}` }
   }
 }
 
-export async function updateWorkStatus(id: string, newStatus: string, customPoints?: number) {
+export async function updateWorkStatus(id: string, newStatus: string, customPoints?: number, blockedReason?: string) {
   const session = await getSession()
   if (!session) return { success: false, error: 'Unauthorized' }
   const user = session.user
@@ -58,21 +76,24 @@ export async function updateWorkStatus(id: string, newStatus: string, customPoin
     const work = await prisma.work.findUnique({ where: { id }, include: { creator: true } })
     if (!work) return { success: false, error: 'Work not found' }
 
-    // ONLY Admins can change status!
-    if (user.role !== 'ADMIN') {
-      return { success: false, error: 'Only Admins can moderate work requests and change statuses' }
+    // Admins can do anything. Members can update if they are creator or assignee.
+    const isAuthorized = user.role === 'ADMIN' || work.creatorId === user.id || work.assigneeId === user.id
+    if (!isAuthorized) {
+      return { success: false, error: 'You are not authorized to update this work item' }
     }
 
     const finalPoints = customPoints !== undefined ? Math.max(0, Math.floor(Number(customPoints))) : work.points
-    const isNowCompleted = newStatus === 'Completed'
-    const wasCompleted = work.status === 'Completed'
+    const isNowCompleted = newStatus === 'COMPLETED'
+    const wasCompleted = work.status === 'COMPLETED'
     const isEditedByAdmin = user.role === 'ADMIN' && work.creatorId !== user.id
 
+    // Update status, points, and blockedReason if BLOCKED
     await prisma.work.update({
       where: { id },
       data: { 
         status: newStatus,
         points: finalPoints,
+        blockedReason: newStatus === 'BLOCKED' ? (blockedReason || 'No reason provided') : null,
         ...(isEditedByAdmin && {
           originalOwnerId: work.creatorId,
           editedByAdminId: user.id,
@@ -94,11 +115,45 @@ export async function updateWorkStatus(id: string, newStatus: string, customPoin
       })
     }
 
-    await logActivity('STATUS_CHANGE', user.id, id, `Status changed to ${newStatus}. Points value set to ${finalPoints}.`)
+    // Log the action
+    let logMsg = `Status changed to ${newStatus}.`
+    if (newStatus === 'BLOCKED') {
+      logMsg += ` Reason: "${blockedReason || 'None'}"`
+    }
+    await logActivity('STATUS_CHANGE', user.id, id, logMsg)
+    
     revalidatePath('/')
+    revalidatePath('/works')
     return { success: true }
   } catch (error: any) {
     console.error('Failed to update work:', error)
+    return { success: false, error: `Database error: ${error.message || error}` }
+  }
+}
+
+export async function addWorkUpdate(workId: string, content: string) {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Unauthorized' }
+  const user = session.user
+
+  if (!content || !content.trim()) return { success: false, error: 'Update content is required' }
+
+  try {
+    await prisma.workUpdate.create({
+      data: {
+        content,
+        workId,
+        userId: user.id
+      }
+    })
+
+    await logActivity('WORK_UPDATE', user.id, workId, `Posted update: "${content}"`)
+    
+    revalidatePath('/')
+    revalidatePath('/works')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to add work update:', error)
     return { success: false, error: `Database error: ${error.message || error}` }
   }
 }
@@ -107,13 +162,27 @@ export async function getWorks() {
   try {
     const data = await prisma.work.findMany({
       include: {
-        creator: { select: { name: true, profilePhoto: true } },
-        editedByAdmin: { select: { name: true } }
+        creator: { select: { id: true, name: true, profilePhoto: true, role: true } },
+        assignee: { select: { id: true, name: true, profilePhoto: true, role: true } },
+        editedByAdmin: { select: { name: true } },
+        workUpdates: {
+          include: {
+            user: { select: { name: true, profilePhoto: true } }
+          },
+          orderBy: { createdAt: 'desc' }
+        },
+        activityLogs: {
+          include: {
+            user: { select: { name: true } }
+          },
+          orderBy: { createdAt: 'desc' }
+        }
       },
       orderBy: { createdAt: 'desc' },
     })
     return JSON.parse(JSON.stringify(data))
   } catch (error) {
+    console.error('Failed to fetch works:', error)
     return []
   }
 }

@@ -3,12 +3,13 @@
 import { usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
 import { useStore } from '@/store/useStore'
+import { Plus } from 'lucide-react'
 
 export default function AppLayout({ children, session }: { children: React.ReactNode, session: any }) {
   const pathname = usePathname()
   const isLoginPage = pathname === '/login'
   const isChatPage = pathname === '/chat'
-  const { isNavbarHidden } = useStore()
+  const { isNavbarHidden, setAddWorkModalOpen } = useStore()
 
   if (isLoginPage) {
     return (
@@ -36,6 +37,17 @@ export default function AppLayout({ children, session }: { children: React.React
           {children}
         </div>
       </main>
+
+      {/* Mobile Floating Action Button (FAB) to start new work */}
+      {session && !isLoginPage && pathname === '/works' && (
+        <button
+          onClick={() => setAddWorkModalOpen(true)}
+          className={`lg:hidden fixed ${isNavbarHidden ? 'bottom-6' : 'bottom-24'} right-6 z-40 bg-[#63BDF2] text-black w-12 h-12 rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(99,189,242,0.45)] hover:scale-105 active:scale-95 transition-all cursor-pointer`}
+          title="Add New Work"
+        >
+          <Plus size={20} className="stroke-[3px]" />
+        </button>
+      )}
     </div>
   )
 }

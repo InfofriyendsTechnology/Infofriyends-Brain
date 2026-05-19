@@ -2,6 +2,7 @@ import { getWorks } from '@/app/actions'
 import { getSession } from '@/lib/auth'
 import WorkWall from '@/components/WorkWall'
 import AddWorkModal from '@/components/AddWorkModal'
+import CreateWorkTrigger from '@/components/CreateWorkTrigger'
 import { FolderGit2 } from 'lucide-react'
 import { Suspense } from 'react'
 
@@ -78,7 +79,7 @@ export default async function WorksPage() {
   const session = await getSession()
 
   return (
-    <div className="space-y-8 pb-20 max-w-[1960px] mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+    <div className="space-y-8 pb-20 w-full px-4 sm:px-6 lg:px-12 pt-6">
       {session && <AddWorkModal user={session.user} />}
 
       {/* Header Banner (Instant Render) */}
@@ -99,6 +100,7 @@ export default async function WorksPage() {
               Track and grow active products, archive completed tasks, and maintain team audit visibility.
             </p>
           </div>
+          {session && <CreateWorkTrigger />}
         </div>
       </div>
 

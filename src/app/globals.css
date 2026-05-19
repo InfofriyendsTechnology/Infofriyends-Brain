@@ -90,3 +90,9 @@ input:-webkit-autofill:active {
   background: var(--primary);
 }
 
+select option {
+  background-color: #0d0e12 !important;
+  color: #ffffff !important;
+}
+
+

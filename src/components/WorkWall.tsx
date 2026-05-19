@@ -1,179 +1,267 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, FolderGit2, SlidersHorizontal, Info, Calendar, Sparkles, Grid, List, CheckCircle2, Circle, Archive } from 'lucide-react'
+import { 
+  Search, FolderGit2, SlidersHorizontal, Grid, List, CheckCircle2, 
+  Circle, Archive, AlertTriangle, User, ShieldAlert, Sparkles, Filter, Loader2, Plus 
+} from 'lucide-react'
 import WorkCard from './WorkCard'
 import { updateWorkStatus } from '@/app/actions'
+import { getMembers } from '@/app/actions/admin'
+import { useStore } from '@/store/useStore'
 
-// Helper component for Table Row Actions (Supports Dynamic Point Allocation!)
-function TableRowAdminActions({ work }: { work: any }) {
-  const [points, setPoints] = useState(work.points || 10)
-  const [isUpdating, setIsUpdating] = useState(false)
-
-  const isCompleted = work.status === 'Completed'
-  const isArchived = work.status === 'Archived'
-  const isPending = work.status === 'Pending'
-
-  const handleStatusChange = async (newStatus: string) => {
-    setIsUpdating(true)
-    try {
-      await updateWorkStatus(work.id, newStatus, points)
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setIsUpdating(false)
-    }
-  }
+function CustomDropdown({ 
+  label, 
+  value, 
+  onChange, 
+  options,
+  chevronColor = 'text-muted-foreground'
+}: { 
+  label: string, 
+  value: string, 
+  onChange: (val: string) => void, 
+  options: { value: string, label: string }[],
+  chevronColor?: string
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const activeOption = options.find(o => o.value === value) || options[0]
 
   return (
-    <div className="flex items-center justify-end gap-3 flex-wrap">
-      {/* Points setting next to action */}
-      {(isPending || (!isCompleted && !isArchived)) && (
-        <div className="flex items-center gap-1.5 bg-[#63BDF2]/5 border border-[#63BDF2]/15 px-2 py-0.5 rounded-lg">
-          <span className="text-[9px] font-bold text-muted-foreground">PTS:</span>
-          <input
-            type="number"
-            min="0"
-            value={points}
-            onChange={(e) => setPoints(Math.max(0, parseInt(e.target.value) || 0))}
-            className="w-10 bg-transparent border-none text-center text-xs font-bold font-mono text-[#63BDF2] focus:outline-none"
-          />
+    <div className="relative select-none z-30">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between gap-2 bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs font-bold text-white hover:border-white/20 transition-all cursor-pointer min-w-[145px]"
+      >
+        <div className="flex items-center gap-1 text-left">
+          <span className="text-[10px] text-muted-foreground uppercase">{label}:</span>
+          <span className="uppercase truncate max-w-[80px]">{activeOption.label}</span>
         </div>
-      )}
+        <span className={`text-[9px] ${chevronColor} transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>▼</span>
+      </button>
 
-      <div className="flex items-center gap-1.5">
-        {isPending && (
-          <button 
-            onClick={() => handleStatusChange('Active')}
-            disabled={isUpdating}
-            className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 text-emerald-400 px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
+      {isOpen && (
+        <>
+          {/* Click-away backdrop */}
+          <div className="fixed inset-0 z-20" onClick={() => setIsOpen(false)} />
+          
+          <motion.div
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="absolute right-0 mt-1.5 w-48 bg-[#0d0e12] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-30 backdrop-blur-xl"
           >
-            <CheckCircle2 size={10} /> Approve
-          </button>
-        )}
-        {!isCompleted && !isArchived && !isPending && (
-          <button 
-            onClick={() => handleStatusChange('Completed')}
-            disabled={isUpdating}
-            className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 text-emerald-400 px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
-          >
-            <CheckCircle2 size={10} /> Complete
-          </button>
-        )}
-        {!isArchived && !isPending && (
-          <button 
-            onClick={() => handleStatusChange('Archived')}
-            disabled={isUpdating}
-            className="bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/25 text-orange-400 px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
-          >
-            <Archive size={10} /> Archive
-          </button>
-        )}
-        {(isCompleted || isArchived) && (
-          <button 
-            onClick={() => handleStatusChange('Active')}
-            disabled={isUpdating}
-            className="bg-[#63BDF2]/10 hover:bg-[#63BDF2]/20 border border-[#63BDF2]/25 text-[#63BDF2] px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
-          >
-            <Circle size={10} /> Activate
-          </button>
-        )}
-      </div>
+            <div className="py-1 max-h-60 overflow-y-auto custom-scrollbar">
+              {options.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value)
+                    setIsOpen(false)
+                  }}
+                  className={`w-full text-left px-3.5 py-2.5 text-xs transition-colors hover:bg-white/5 cursor-pointer uppercase font-semibold ${
+                    opt.value === value ? 'text-[#63BDF2] bg-[#63BDF2]/5 font-bold' : 'text-white'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        </>
+      )}
     </div>
   )
 }
 
 export default function WorkWall({ works, currentUser }: { works: any[], currentUser: any }) {
-  const [filter, setFilter] = useState('Active')
+  const [activeScope, setActiveScope] = useState<'all' | 'focus'>('all')
+  const [statusFilter, setStatusFilter] = useState('ALL') // ALL, IDEA, ACTIVE, BLOCKED, COMPLETED, ARCHIVED
+  const [priorityFilter, setPriorityFilter] = useState('ALL') // ALL, LOW, MEDIUM, HIGH, URGENT
+  const [memberFilter, setMemberFilter] = useState('ALL') // ALL, or user ID
   const [searchTerm, setSearchTerm] = useState('')
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
+  const [members, setMembers] = useState<any[]>([])
+  const [isUpdatingRow, setIsUpdatingRow] = useState<string | null>(null)
+  const { setAddWorkModalOpen } = useStore()
 
-  // Secure visibility logic: 
-  // - Active, Completed, and Archived works are visible to everyone.
-  // - Pending works are ONLY visible to Admins OR the member who created the request.
-  const visibleWorks = works.filter(w => {
-    if (w.status !== 'Pending') return true
-    return currentUser?.role === 'ADMIN' || w.creatorId === currentUser?.id
-  })
-
-  const hasPending = works.some(w => w.status === 'Pending' && (currentUser?.role === 'ADMIN' || w.creatorId === currentUser?.id))
-
-  const filterTabs = [
-    'Active',
-    'Completed',
-    'Archived',
-    ...(hasPending ? ['Pending'] : []),
-    'All'
+  const statusOptions = [
+    { value: 'ALL', label: 'All Statuses' },
+    { value: 'IDEA', label: 'Idea' },
+    { value: 'ACTIVE', label: 'Active' },
+    { value: 'BLOCKED', label: 'Blocked' },
+    { value: 'COMPLETED', label: 'Completed' },
+    { value: 'ARCHIVED', label: 'Archived' },
   ]
 
-  // Filter works by state and search keyword
-  const filteredWorks = visibleWorks.filter(w => {
-    const matchesFilter = filter === 'All' ? true : w.status === filter
+  const priorityOptions = [
+    { value: 'ALL', label: 'All Priorities' },
+    { value: 'LOW', label: 'Low' },
+    { value: 'MEDIUM', label: 'Medium' },
+    { value: 'HIGH', label: 'High' },
+    { value: 'URGENT', label: 'Urgent' },
+  ]
+
+  const memberOptions = [
+    { value: 'ALL', label: 'All Members' },
+    ...members.map(m => ({ value: m.id, label: m.name }))
+  ]
+
+  useEffect(() => {
+    async function loadMembers() {
+      try {
+        const list = await getMembers()
+        setMembers(list)
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    loadMembers()
+  }, [])
+
+  // Filter logic: Scope selection (Global Wall vs My Daily Focus)
+  const scopedWorks = works.filter(w => {
+    if (activeScope === 'focus') {
+      if (!currentUser) return false
+      // My focus area shows works assigned to me OR blocked/idea/active works I created
+      const isAssignedToMe = w.assigneeId === currentUser.id
+      const isCreatedByMeAndUnresolved = w.creatorId === currentUser.id && ['BLOCKED', 'IDEA', 'ACTIVE'].includes(w.status)
+      return isAssignedToMe || isCreatedByMeAndUnresolved
+    }
+    return true
+  })
+
+  // Filter works by user selections (status, priority, member, search keyword)
+  const filteredWorks = scopedWorks.filter(w => {
+    // Status
+    const matchesStatus = statusFilter === 'ALL' ? true : w.status === statusFilter
+    
+    // Priority
+    const matchesPriority = priorityFilter === 'ALL' ? true : w.priority === priorityFilter
+    
+    // Member
+    const matchesMember = memberFilter === 'ALL' 
+      ? true 
+      : (w.assigneeId === memberFilter || w.creatorId === memberFilter)
+
+    // Search Keyword
     const matchesSearch = 
       w.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       w.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (w.creator?.name && w.creator.name.toLowerCase().includes(searchTerm.toLowerCase()))
-    return matchesFilter && matchesSearch
+      (w.creator?.name && w.creator.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (w.assignee?.name && w.assignee.name.toLowerCase().includes(searchTerm.toLowerCase()))
+
+    return matchesStatus && matchesPriority && matchesMember && matchesSearch
   })
 
+  const handleTableRowStatusChange = async (id: string, newStatus: string) => {
+    setIsUpdatingRow(id)
+    try {
+      await updateWorkStatus(id, newStatus)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setIsUpdatingRow(null)
+    }
+  }
+
+  // Count metrics for quick HUD display
+  const blockedCount = works.filter(w => w.status === 'BLOCKED').length
+  const myWorkCount = currentUser 
+    ? works.filter(w => w.assigneeId === currentUser.id).length 
+    : 0
+
   return (
-    <div className="space-y-8">
-      {/* Top HUD Header Control Panel */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 pb-6 border-b border-border/30">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-[#63BDF2]/10 border border-[#63BDF2]/20 text-[#63BDF2] rounded-2xl shadow-inner">
-            <FolderGit2 size={24} />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-              Work Pipeline <span className="text-[10px] uppercase font-bold tracking-wider text-[#63BDF2] bg-[#63BDF2]/10 border border-[#63BDF2]/20 px-2 py-0.5 rounded">Realtime</span>
-            </h2>
-            <p className="text-xs text-muted-foreground">Showing {filteredWorks.length} async projects currently indexed.</p>
-          </div>
+    <div className="space-y-6">
+      {/* Top Scope Selector (Daily Focus Tab vs Global Pipeline Tab) */}
+      <div className="flex bg-[#09090b]/60 p-1.5 rounded-2xl border border-white/10 w-fit shrink-0 select-none">
+        <button
+          onClick={() => {
+            setActiveScope('all')
+            setStatusFilter('ALL')
+          }}
+          className={`relative px-4 py-2 text-xs font-black rounded-xl transition-all whitespace-nowrap cursor-pointer uppercase tracking-wider ${
+            activeScope === 'all' ? 'text-black z-10' : 'text-muted-foreground hover:text-white'
+          }`}
+        >
+          {activeScope === 'all' && (
+            <motion.span
+              layoutId="activeScopeTab"
+              className="absolute inset-0 bg-gradient-to-r from-[#63BDF2] to-[#3188DA] rounded-xl shadow-lg"
+              transition={{ type: "spring", stiffness: 380, damping: 30 }}
+            />
+          )}
+          <span className="relative z-10 flex items-center gap-1.5">
+            <FolderGit2 size={13} /> Global Workspace Wall
+          </span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveScope('focus')
+            setStatusFilter('ALL')
+          }}
+          className={`relative px-4 py-2 text-xs font-black rounded-xl transition-all whitespace-nowrap cursor-pointer uppercase tracking-wider ${
+            activeScope === 'focus' ? 'text-black z-10' : 'text-muted-foreground hover:text-white'
+          }`}
+        >
+          {activeScope === 'focus' && (
+            <motion.span
+              layoutId="activeScopeTab"
+              className="absolute inset-0 bg-gradient-to-r from-[#63BDF2] to-[#3188DA] rounded-xl shadow-lg"
+              transition={{ type: "spring", stiffness: 380, damping: 30 }}
+            />
+          )}
+          <span className="relative z-10 flex items-center gap-1.5">
+            <User size={13} /> My Focus Area ({myWorkCount})
+          </span>
+        </button>
+      </div>
+
+      {/* Control Bar: Search & Select Dropdown Filters */}
+      <div className="bg-[#09090b]/40 border border-white/5 p-4 rounded-3xl backdrop-blur-xl flex flex-col xl:flex-row gap-4 items-stretch xl:items-center justify-between">
+        
+        {/* Left: Search Box */}
+        <div className="relative flex-1 min-w-[240px]">
+          <input
+            type="text"
+            placeholder="Search works, creators, assignees..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-[#63BDF2]/60 focus:ring-1 focus:ring-[#63BDF2]/20 transition-all font-medium"
+          />
+          <Search className="absolute left-3 top-3 text-muted-foreground" size={14} />
         </div>
 
-        {/* Dynamic Filters & Search Desk */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-          {/* Search Box */}
-          <div className="relative flex-1 sm:w-64">
-            <input
-              type="text"
-              placeholder="Search works or creators..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[#09090b]/80 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-[#63BDF2]/60 focus:ring-1 focus:ring-[#63BDF2]/20 transition-all font-medium"
-            />
-            <Search className="absolute left-3 top-3 text-muted-foreground" size={14} />
-          </div>
+        {/* Right: Select Controls */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Status Filter Custom Dropdown */}
+          <CustomDropdown
+            label="Status"
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={statusOptions}
+          />
 
-          {/* Styled Segmented Selector Tabs */}
-          <div className="flex bg-[#09090b]/60 p-1 rounded-xl border border-white/10 overflow-x-auto custom-scrollbar shrink-0 max-w-full">
-            {filterTabs.map(f => {
-              const isActive = filter === f
-              return (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  className={`relative px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer select-none uppercase tracking-wider ${
-                    isActive ? 'text-black z-10' : 'text-muted-foreground hover:text-white'
-                  }`}
-                >
-                  {isActive && (
-                    <motion.span
-                      layoutId="activeFilterTab"
-                      className="absolute inset-0 bg-white rounded-lg shadow-md"
-                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                    />
-                  )}
-                  <span className="relative z-10">{f}</span>
-                </button>
-              )
-            })}
-          </div>
+          {/* Priority Filter Custom Dropdown */}
+          <CustomDropdown
+            label="Priority"
+            value={priorityFilter}
+            onChange={setPriorityFilter}
+            options={priorityOptions}
+          />
 
-          {/* View Toggles (Grid vs Table) - Hidden on Mobile */}
-          <div className="hidden md:flex bg-[#09090b]/60 p-1 rounded-xl border border-white/10 shrink-0 select-none">
+          {/* Member Filter Custom Dropdown */}
+          <CustomDropdown
+            label="Member"
+            value={memberFilter}
+            onChange={setMemberFilter}
+            options={memberOptions}
+          />
+
+          {/* Grid vs Table Layout selection (Hidden on Mobile) */}
+          <div className="hidden md:flex bg-[#0c0d12]/60 p-1 rounded-xl border border-white/10 shrink-0 select-none">
             <button
               onClick={() => setViewMode('grid')}
               className={`p-1.5 rounded-lg transition-all cursor-pointer ${
@@ -196,24 +284,44 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
         </div>
       </div>
 
-      {/* Grid vs Table layouts */}
+      {/* Blocked Works Header Alert (Warns when active projects are blocked) */}
+      {blockedCount > 0 && activeScope === 'all' && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-3xl flex items-center justify-between text-xs gap-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={16} className="animate-pulse" />
+            <span>There are currently <strong className="font-black text-white">{blockedCount} works marked as BLOCKED</strong>. Admins and team members should review and help resolve blocker issues.</span>
+          </div>
+          <button 
+            onClick={() => {
+              setStatusFilter('BLOCKED')
+              setPriorityFilter('ALL')
+              setMemberFilter('ALL')
+            }}
+            className="bg-red-500 hover:bg-red-600 text-black px-3 py-1.5 rounded-xl font-bold uppercase text-[10px] tracking-wider cursor-pointer"
+          >
+            Review Blocks
+          </button>
+        </div>
+      )}
+
+      {/* Grid or Table listing display */}
       {filteredWorks.length === 0 ? (
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="h-64 rounded-3xl border border-dashed border-white/10 bg-secondary/5 flex flex-col items-center justify-center text-center p-8 space-y-3"
+          className="h-64 rounded-3xl border border-dashed border-white/10 bg-[#09090b]/40 flex flex-col items-center justify-center text-center p-8 space-y-3"
         >
           <div className="p-3 bg-white/5 border border-white/5 rounded-full text-muted-foreground">
             <SlidersHorizontal size={24} />
           </div>
           <div className="space-y-1">
-            <h3 className="text-sm font-bold text-white">No work requests found</h3>
-            <p className="text-xs text-muted-foreground max-w-xs mx-auto">Try refining your keyword search or select a different status filter tab.</p>
+            <h3 className="text-sm font-bold text-white">No matching work files found</h3>
+            <p className="text-xs text-muted-foreground max-w-xs mx-auto">Try refining your keyword search, removing dropdown filters, or checking your status settings.</p>
           </div>
         </motion.div>
       ) : (
         <>
-          {/* Grid View (Visible on Mobile, or when viewMode is 'grid' on Desktop) */}
+          {/* Grid Layout View (Fallback for small mobile screens) */}
           <div className={viewMode === 'grid' ? 'block' : 'block md:hidden'}>
             <motion.div 
               layout
@@ -227,7 +335,7 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
             </motion.div>
           </div>
 
-          {/* Table View (Desktop Only when viewMode is 'table') */}
+          {/* Table Layout View (For large desktop viewports) */}
           {viewMode === 'table' && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -238,61 +346,155 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
                 <table className="w-full text-sm text-left border-collapse">
                   <thead>
                     <tr className="bg-secondary/40 text-muted-foreground border-b border-white/5 text-[10px] font-bold uppercase tracking-wider">
-                      <th className="px-6 py-4">Task / Project</th>
-                      <th className="px-6 py-4">Creator</th>
+                      <th className="px-6 py-4">Task Details</th>
+                      <th className="px-6 py-4">Team Assignees</th>
+                      <th className="px-6 py-4 text-center">Priority</th>
                       <th className="px-6 py-4 text-center">Status</th>
-                      <th className="px-6 py-4 text-right">Value</th>
-                      {currentUser?.role === 'ADMIN' && <th className="px-6 py-4 text-right">Admin Actions</th>}
+                      <th className="px-6 py-4 text-right">Sprint Value</th>
+                      <th className="px-6 py-4 text-right">Interactive Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 text-xs">
-                    {filteredWorks.map((work) => (
-                      <tr key={work.id} className="hover:bg-secondary/15 transition-all">
-                        {/* Task details */}
-                        <td className="px-6 py-4 max-w-sm">
-                          <p className={`font-bold text-white mb-1 ${work.status === 'Completed' || work.status === 'Archived' ? 'line-through text-muted-foreground' : ''}`}>{work.name}</p>
-                          <p className="text-[10px] text-muted-foreground line-clamp-1">{work.description}</p>
-                        </td>
+                    {filteredWorks.map((work) => {
+                      const isRowCompleted = work.status === 'COMPLETED'
+                      const isRowArchived = work.status === 'ARCHIVED'
+                      const isRowBlocked = work.status === 'BLOCKED'
 
-                        {/* Creator */}
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            {work.creator?.profilePhoto ? (
-                              <img src={work.creator.profilePhoto} alt={work.creator.name} className="w-6 h-6 rounded-full object-cover border border-white/10" />
-                            ) : (
-                              <div className="w-6 h-6 rounded-full bg-[#63BDF2]/20 text-[#63BDF2] flex items-center justify-center font-bold text-[9px] uppercase">
-                                {work.creator?.name ? work.creator.name.charAt(0) : '?'}
-                              </div>
-                            )}
-                            <span className="font-semibold text-white/95">{work.creator?.name || 'Unknown'}</span>
-                          </div>
-                        </td>
+                      // User permissions check
+                      const isRowCreatorOrAssignee = currentUser && (work.creatorId === currentUser.id || work.assigneeId === currentUser.id)
+                      const isAuthorizedRow = currentUser?.role === 'ADMIN' || isRowCreatorOrAssignee
 
-                        {/* Status badge */}
-                        <td className="px-6 py-4 text-center">
-                          <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                            work.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                            work.status === 'Pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse' :
-                            work.status === 'Archived' ? 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20' :
-                            'bg-[#63BDF2]/10 text-[#63BDF2] border border-[#63BDF2]/20'
-                          }`}>
-                            {work.status}
-                          </span>
-                        </td>
-
-                        {/* Rewards value */}
-                        <td className="px-6 py-4 text-right font-bold text-[#63BDF2] font-mono">
-                          +{work.points || 10} PTS
-                        </td>
-
-                        {/* Admin Actions */}
-                        {currentUser?.role === 'ADMIN' && (
-                          <td className="px-6 py-4 text-right">
-                            <TableRowAdminActions work={work} />
+                      return (
+                        <tr key={work.id} className="hover:bg-secondary/15 transition-all">
+                          {/* Title & description details */}
+                          <td className="px-6 py-4 max-w-xs">
+                            <div className="space-y-1">
+                              <p className={`font-bold text-white mb-1 ${isRowCompleted || isRowArchived ? 'line-through text-muted-foreground' : ''}`}>{work.name}</p>
+                              <p className="text-[10px] text-muted-foreground line-clamp-1">{work.description}</p>
+                              {work.dueDate && (
+                                <p className="text-[9px] text-orange-400/90 font-semibold" suppressHydrationWarning>Due: {new Date(work.dueDate).toLocaleDateString()}</p>
+                              )}
+                              {isRowBlocked && work.blockedReason && (
+                                <p className="text-[10px] text-red-400 font-bold italic line-clamp-1">Blocked: {work.blockedReason}</p>
+                              )}
+                            </div>
                           </td>
-                        )}
-                      </tr>
-                    ))}
+
+                          {/* Creator & Assignee */}
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col gap-1.5 text-[10px]">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[9px] text-muted-foreground w-11 uppercase">Creator:</span>
+                                {work.creator?.profilePhoto ? (
+                                  <img src={work.creator.profilePhoto} alt={work.creator.name} className="w-4 h-4 rounded-full object-cover" />
+                                ) : (
+                                  <div className="w-4 h-4 rounded-full bg-[#3188DA]/20 text-[#3188DA] flex items-center justify-center font-bold text-[8px]">
+                                    {work.creator?.name ? work.creator.name.charAt(0) : '?'}
+                                  </div>
+                                )}
+                                <span className="text-white font-medium truncate max-w-[90px]">{work.creator?.name || 'System'}</span>
+                              </div>
+
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[9px] text-muted-foreground w-11 uppercase">Assignee:</span>
+                                {work.assignee ? (
+                                  <>
+                                    {work.assignee.profilePhoto ? (
+                                      <img src={work.assignee.profilePhoto} alt={work.assignee.name} className="w-4 h-4 rounded-full object-cover" />
+                                    ) : (
+                                      <div className="w-4 h-4 rounded-full bg-[#63BDF2]/20 text-[#63BDF2] flex items-center justify-center font-bold text-[8px]">
+                                        {work.assignee.name.charAt(0)}
+                                      </div>
+                                    )}
+                                    <span className="text-white font-medium truncate max-w-[90px]">{work.assignee.name}</span>
+                                  </>
+                                ) : (
+                                  <span className="text-zinc-500 italic">Unassigned</span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Priority */}
+                          <td className="px-6 py-4 text-center">
+                            <span className={`inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                              work.priority === 'URGENT' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                              work.priority === 'HIGH' ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' :
+                              work.priority === 'LOW' ? 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20' :
+                              'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                            }`}>
+                              {work.priority}
+                            </span>
+                          </td>
+
+                          {/* Status */}
+                          <td className="px-6 py-4 text-center">
+                            <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                              isRowCompleted ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                              isRowBlocked ? 'bg-red-500/15 text-red-400 border border-red-500/25 animate-pulse font-black' :
+                              work.status === 'IDEA' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                              isRowArchived ? 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20' :
+                              'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                            }`}>
+                              {work.status}
+                            </span>
+                          </td>
+
+                          {/* Sprint points */}
+                          <td className="px-6 py-4 text-right font-bold text-[#63BDF2] font-mono">
+                            +{work.points || 10} PTS
+                          </td>
+
+                          {/* Interactive Row Actions */}
+                          <td className="px-6 py-4 text-right">
+                            {isAuthorizedRow ? (
+                              <div className="flex items-center justify-end gap-1.5">
+                                {isUpdatingRow === work.id ? (
+                                  <Loader2 size={12} className="animate-spin text-muted-foreground" />
+                                ) : (
+                                  <>
+                                    {work.status !== 'ACTIVE' && !isRowCompleted && !isRowArchived && (
+                                      <button 
+                                        onClick={() => handleTableRowStatusChange(work.id, 'ACTIVE')}
+                                        className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/25 px-2 py-0.5 rounded text-[9px] font-bold uppercase"
+                                      >
+                                        Start
+                                      </button>
+                                    )}
+                                    {!isRowCompleted && !isRowArchived && (
+                                      <button 
+                                        onClick={() => handleTableRowStatusChange(work.id, 'COMPLETED')}
+                                        className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/25 px-2 py-0.5 rounded text-[9px] font-bold uppercase"
+                                      >
+                                        Complete
+                                      </button>
+                                    )}
+                                    {!isRowArchived && (
+                                      <button 
+                                        onClick={() => handleTableRowStatusChange(work.id, 'ARCHIVED')}
+                                        className="bg-zinc-500/10 hover:bg-zinc-500/20 text-zinc-400 border border-zinc-500/25 px-2 py-0.5 rounded text-[9px] font-bold uppercase"
+                                      >
+                                        Archive
+                                      </button>
+                                    )}
+                                    {(isRowCompleted || isRowArchived || isRowBlocked) && (
+                                      <button 
+                                        onClick={() => handleTableRowStatusChange(work.id, 'IDEA')}
+                                        className="bg-[#63BDF2]/10 hover:bg-[#63BDF2]/20 text-[#63BDF2] border border-[#63BDF2]/25 px-2 py-0.5 rounded text-[9px] font-bold uppercase"
+                                      >
+                                        Move to Idea
+                                      </button>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-zinc-600 italic">No permissions</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

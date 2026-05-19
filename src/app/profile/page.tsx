@@ -198,7 +198,7 @@ export default async function ProfilePage() {
   }
 
   return (
-    <div className="space-y-8 pb-20 max-w-[1960px] mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+    <div className="space-y-8 pb-20 w-full px-4 sm:px-6 lg:px-12 pt-6">
       {/* Header Banner (Instant Render) */}
       <div className="relative overflow-hidden rounded-3xl border border-border/40 bg-gradient-to-br from-secondary/15 via-background to-secondary/10 p-6 md:p-8 backdrop-blur-xl">
         {/* Subtle Ambient Glows */}

@@ -35,6 +35,8 @@ model User {
   worksCreated      Work[]          @relation("WorkCreator")
   worksOriginal     Work[]          @relation("WorkOriginalOwner")
   worksEdited       Work[]          @relation("WorkEditor")
+  worksAssigned     Work[]          @relation("WorkAssignee")
+  workUpdates       WorkUpdate[]
   activityLogs      ActivityLog[]
   communityPosts    CommunityPost[]
   dailyUpdates      DailyUpdate[]
@@ -46,12 +48,20 @@ model Work {
   id              String   @id @default(cuid())
   name            String
   description     String   @db.Text
-  status          String   @default("Active") // Active, Completed, Archived
+  status          String   @default("IDEA") // IDEA, ACTIVE, BLOCKED, COMPLETED, ARCHIVED
+  priority        String   @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  dueDate         DateTime?
+  blockedReason   String?  @db.Text
   points          Int      @default(10)
   
   // Relations
   creatorId       String
   creator         User     @relation("WorkCreator", fields: [creatorId], references: [id])
+  
+  assigneeId      String?
+  assignee        User?    @relation("WorkAssignee", fields: [assigneeId], references: [id])
+
+  workUpdates     WorkUpdate[]
   
   // For admin edits
   originalOwnerId String?
@@ -129,4 +139,14 @@ model TypingState {
   channelId String
   channel   ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
   updatedAt DateTime    @updatedAt
+}
+
+model WorkUpdate {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workId    String
+  work      Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 }

@@ -770,6 +770,19 @@ export default function AdminDashboardClient({ initialMembers }: { initialMember
           )
         })()}
       </AnimatePresence>
+
+      {/* Mobile Floating Action Button (FAB) to Add Member */}
+      <button
+        onClick={() => {
+          setAddError(null)
+          setAddSuccessData(null)
+          setIsAddOpen(true)
+        }}
+        className="lg:hidden fixed bottom-24 right-6 z-40 bg-[#63BDF2] text-black w-12 h-12 rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(99,189,242,0.45)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
+        title="Add New Member"
+      >
+        <Plus size={20} className="stroke-[3px]" />
+      </button>
     </div>
   )
 }

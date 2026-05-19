@@ -22,8 +22,8 @@ async function MetricsSection() {
     posts = await getCommunityPosts()
   } catch (e) {}
 
-  const activeWorksCount = works.filter(w => w.status === 'Active').length
-  const completedWorksCount = works.filter(w => w.status === 'Completed').length
+  const activeWorksCount = works.filter(w => w.status === 'Active' || w.status === 'ACTIVE').length
+  const completedWorksCount = works.filter(w => w.status === 'Completed' || w.status === 'COMPLETED').length
   const totalPostsCount = posts.length
 
   return (
@@ -61,7 +61,7 @@ async function ActiveProjectsSection({ currentUser }: { currentUser: any }) {
     works = await getWorks()
   } catch (e) {}
 
-  const activeWorks = works.filter(w => w.status === 'Active')
+  const activeWorks = works.filter(w => w.status === 'Active' || w.status === 'ACTIVE')
   const activeWorksPreview = activeWorks.slice(0, 3)
 
   return (
