@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, UserPlus, Edit3, Trash2, Shield, User, Award, Mail, Phone, X, ShieldAlert, CheckCircle2, ShieldCheck, HelpCircle, Eye, Sparkles } from 'lucide-react'
+import { Plus, UserPlus, Edit3, Trash2, Shield, User, Award, Mail, Phone, X, ShieldAlert, CheckCircle2, ShieldCheck, HelpCircle, Eye, Sparkles, Loader2 } from 'lucide-react'
 import { createMember, updateMember, deleteMember } from '@/app/actions/admin'
 
 export default function AdminDashboardClient({ initialMembers }: { initialMembers: any[] }) {
@@ -367,9 +367,16 @@ export default function AdminDashboardClient({ initialMembers }: { initialMember
                 <button
                   type="submit"
                   disabled={isSubmittingAdd}
-                  className="w-full bg-gradient-to-r from-[#63BDF2] to-[#3188DA] text-black py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 mt-6 cursor-pointer shadow-lg shadow-[#63BDF2]/10"
+                  className="w-full bg-gradient-to-r from-[#63BDF2] to-[#3188DA] text-black py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-6 cursor-pointer shadow-lg shadow-[#63BDF2]/10 flex items-center justify-center gap-2"
                 >
-                  {isSubmittingAdd ? 'Creating...' : 'Create Account'}
+                  {isSubmittingAdd ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Account'
+                  )}
                 </button>
               </form>
             </motion.div>
@@ -462,9 +469,16 @@ export default function AdminDashboardClient({ initialMembers }: { initialMember
                 <button
                   type="submit"
                   disabled={isSubmittingEdit}
-                  className="w-full bg-gradient-to-r from-[#63BDF2] to-[#3188DA] text-black py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 mt-6 cursor-pointer shadow-lg shadow-[#63BDF2]/10"
+                  className="w-full bg-gradient-to-r from-[#63BDF2] to-[#3188DA] text-black py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-6 cursor-pointer shadow-lg shadow-[#63BDF2]/10 flex items-center justify-center gap-2"
                 >
-                  {isSubmittingEdit ? 'Saving...' : 'Save Member Details'}
+                  {isSubmittingEdit ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Member Details'
+                  )}
                 </button>
               </form>
             </motion.div>
@@ -510,9 +524,16 @@ export default function AdminDashboardClient({ initialMembers }: { initialMember
                   <button 
                     onClick={handleDeleteConfirm}
                     disabled={isSubmittingDelete}
-                    className="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-500/90 hover:to-red-600/90 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-lg shadow-red-500/10"
+                    className="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-500/90 hover:to-red-600/90 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-lg shadow-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                   >
-                    {isSubmittingDelete ? 'Deleting...' : 'Delete User'}
+                    {isSubmittingDelete ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      'Delete User'
+                    )}
                   </button>
                 </div>
               </div>

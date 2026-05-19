@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, MessageSquare, ShieldCheck, User, Users, Clock, Sparkles, Plus, Hash, FolderGit2, X, AlertCircle } from 'lucide-react'
+import { Send, MessageSquare, ShieldCheck, User, Users, Clock, Sparkles, Plus, Hash, FolderGit2, X, AlertCircle, Loader2 } from 'lucide-react'
 import { sendChatMessage, createChatChannel, setUserTyping, syncChatroom, touchUserHeartbeat } from '@/app/actions/chat'
 
 interface Channel {
@@ -579,9 +579,16 @@ export default function ChatClient({
                 <button
                   type="submit"
                   disabled={!newGroupName.trim() || isCreatingGroup}
-                  className="w-full bg-gradient-to-r from-[#63BDF2] to-[#3188DA] text-black hover:opacity-95 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all disabled:opacity-50 mt-4 cursor-pointer"
+                  className="w-full bg-gradient-to-r from-[#63BDF2] to-[#3188DA] text-black hover:opacity-95 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4 cursor-pointer flex items-center justify-center gap-2"
                 >
-                  {isCreatingGroup ? 'Creating Group...' : 'Create Chat Group'}
+                  {isCreatingGroup ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      Creating Group...
+                    </>
+                  ) : (
+                    'Create Chat Group'
+                  )}
                 </button>
               </form>
             </motion.div>

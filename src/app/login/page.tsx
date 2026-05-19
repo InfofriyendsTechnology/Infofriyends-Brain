@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { ShieldAlert, ArrowRight, Activity } from 'lucide-react'
+import { ShieldAlert, ArrowRight, Activity, Loader2 } from 'lucide-react'
 import { loginAction } from '@/app/actions/auth'
 
 export default function LoginPage() {
@@ -87,13 +87,12 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full relative bg-gradient-to-r from-[#63BDF2] to-[#3188DA] text-black hover:opacity-95 py-3.5 rounded-xl font-black text-sm uppercase tracking-wider transition-all disabled:opacity-50 mt-6 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-black/20"
+              className="w-full relative bg-gradient-to-r from-[#63BDF2] to-[#3188DA] text-black hover:opacity-95 py-3.5 rounded-xl font-black text-sm uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-6 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-black/20"
             >
               {isSubmitting ? (
-                <span className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 bg-black rounded-full animate-bounce" />
-                  <span className="w-1.5 h-1.5 bg-black rounded-full animate-bounce [animation-delay:0.2s]" />
-                  <span className="w-1.5 h-1.5 bg-black rounded-full animate-bounce [animation-delay:0.4s]" />
+                <span className="flex items-center justify-center gap-2 font-bold">
+                  <Loader2 size={16} className="animate-spin" />
+                  Connecting to Brain...
                 </span>
               ) : (
                 <>

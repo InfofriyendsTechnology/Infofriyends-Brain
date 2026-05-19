@@ -3,7 +3,7 @@
 import { createCommunityPost } from '@/app/actions'
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Send, ArrowUpRight, Lightbulb, Zap, Activity } from 'lucide-react'
+import { Send, ArrowUpRight, Lightbulb, Zap, Activity, Loader2 } from 'lucide-react'
 
 export default function TodayChanged({ posts, currentUser }: { posts: any[], currentUser: any }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -90,9 +90,14 @@ export default function TodayChanged({ posts, currentUser }: { posts: any[], cur
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full mt-2 bg-white text-black hover:bg-white/90 flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all disabled:opacity-50"
+              className="w-full mt-2 bg-white text-black hover:bg-white/90 flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
-              {isSubmitting ? 'Posting...' : (
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Posting...
+                </>
+              ) : (
                 <>
                   <Send size={18} /> Post as {currentUser?.name || 'Member'}
                 </>

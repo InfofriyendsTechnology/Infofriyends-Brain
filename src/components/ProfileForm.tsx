@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { updateProfileAction } from '@/app/actions/profile'
 import { motion } from 'framer-motion'
-import { Save, User, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Save, User, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 
 export default function ProfileForm({ user }: { user: any }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -122,10 +122,19 @@ export default function ProfileForm({ user }: { user: any }) {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full md:w-auto flex items-center justify-center gap-2 bg-white text-black hover:bg-white/90 px-8 py-3.5 rounded-xl font-bold transition-all disabled:opacity-50"
+        className="w-full md:w-auto flex items-center justify-center gap-2 bg-white text-black hover:bg-white/90 px-8 py-3.5 rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
       >
-        <Save size={18} />
-        {isSubmitting ? 'Saving changes...' : 'Save Settings'}
+        {isSubmitting ? (
+          <>
+            <Loader2 size={18} className="animate-spin" />
+            Saving changes...
+          </>
+        ) : (
+          <>
+            <Save size={18} />
+            Save Settings
+          </>
+        )}
       </button>
     </form>
   )
