@@ -17,8 +17,12 @@ export default function AddWorkModal({ user }: { user: any }) {
     setIsSubmitting(true)
     setError(null)
     try {
-      await createWork(formData)
-      setAddWorkModalOpen(false)
+      const res = await createWork(formData)
+      if (res && !res.success) {
+        setError(res.error || 'Failed to create work.')
+      } else {
+        setAddWorkModalOpen(false)
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to create work.')
     } finally {

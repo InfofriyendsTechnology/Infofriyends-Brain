@@ -10,7 +10,7 @@ export async function loginAction(formData: FormData) {
   const password = formData.get('password') as string
 
   if (!username || !password) {
-    throw new Error('Please enter both username and password')
+    return { success: false, error: 'Please enter both username and password' }
   }
 
   // Handle mock fallback when db fails or is not connected
@@ -43,24 +43,20 @@ export async function loginAction(formData: FormData) {
 
     const user = await prisma.user.findUnique({ where: { username } })
     if (!user) {
-      throw new Error('Invalid credentials')
+      return { success: false, error: 'Invalid credentials' }
     }
 
     const isValid = await verifyPassword(password, user.passwordHash)
     if (!isValid) {
-      throw new Error('Invalid credentials')
+      return { success: false, error: 'Invalid credentials' }
     }
 
     await login({ id: user.id, role: user.role, name: user.name, username: user.username })
+    return { success: true }
   } catch (error: any) {
-    if (error.message === 'Invalid credentials' || error.message.includes('Please enter')) {
-      throw error
-    }
     console.error('Login error:', error)
-    throw new Error('Database error. Ensure Supabase is connected.')
+    return { success: false, error: `Database error: ${error.message || error}` }
   }
-
-  return { success: true }
 }
 
 export async function logoutAction() {

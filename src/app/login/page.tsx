@@ -19,9 +19,12 @@ export default function LoginPage() {
       if (res?.success) {
         router.push('/')
         router.refresh()
+      } else {
+        setError(res?.error || 'An unexpected error occurred.')
+        setIsSubmitting(false)
       }
     } catch (e: any) {
-      setError(e.message)
+      setError(e.message || 'Network communication failure.')
       setIsSubmitting(false)
     }
   }
