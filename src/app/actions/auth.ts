@@ -18,10 +18,10 @@ export async function loginAction(formData: FormData) {
     // Fake login if db isn't there just for demonstration of UI
     if (username === 'admin') {
       await login({ id: 'fake-admin-id', role: 'ADMIN', name: 'Admin', username: 'admin' })
-      redirect('/')
+      return { success: true }
     } else {
       await login({ id: 'fake-member-id', role: 'MEMBER', name: 'Demo Member', username: 'member' })
-      redirect('/')
+      return { success: true }
     }
   }
 
@@ -60,12 +60,12 @@ export async function loginAction(formData: FormData) {
     throw new Error('Database error. Ensure Supabase is connected.')
   }
 
-  redirect('/')
+  return { success: true }
 }
 
 export async function logoutAction() {
   await logout()
-  redirect('/login')
+  return { success: true }
 }
 
 

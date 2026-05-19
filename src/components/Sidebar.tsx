@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LayoutDashboard, Briefcase, Shield, LogOut, Plus, User, HelpCircle, MessageSquare } from 'lucide-react'
 import { useStore } from '@/store/useStore'
@@ -10,6 +10,7 @@ import { useState, useEffect } from 'react'
 
 export default function Sidebar({ session }: { session: any }) {
   const pathname = usePathname()
+  const router = useRouter()
   const { setAddWorkModalOpen } = useStore()
   const [greeting, setGreeting] = useState('Hey')
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
@@ -41,7 +42,7 @@ export default function Sidebar({ session }: { session: any }) {
               whileHover={{ scale: 1.05 }}
               className="bg-[#63BDF2]/10 p-2 w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
             >
-              <img src="/IB_LOGO.png" alt="Logo" className="h-7 w-auto object-contain" />
+              <img src="/IB_LOGO.png" alt="Logo" className="max-h-full max-w-full object-contain" />
             </motion.div>
             <div className="flex flex-col min-w-0">
               <span className="font-bold text-base tracking-tight leading-none bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent truncate">
@@ -255,9 +256,13 @@ export default function Sidebar({ session }: { session: any }) {
                     Cancel
                   </button>
                   <button 
-                    onClick={() => {
+                    onClick={async () => {
                       setShowLogoutConfirm(false)
-                      logoutAction()
+                      const res = await logoutAction()
+                      if (res?.success) {
+                        router.push('/login')
+                        router.refresh()
+                      }
                     }}
                     className="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-500/90 hover:to-red-600/90 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-lg shadow-red-500/10"
                   >

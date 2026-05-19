@@ -2,10 +2,12 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import { ShieldAlert, ArrowRight, Activity, Loader2 } from 'lucide-react'
 import { loginAction } from '@/app/actions/auth'
 
 export default function LoginPage() {
+  const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -13,7 +15,11 @@ export default function LoginPage() {
     setIsSubmitting(true)
     setError(null)
     try {
-      await loginAction(formData)
+      const res = await loginAction(formData)
+      if (res?.success) {
+        router.push('/')
+        router.refresh()
+      }
     } catch (e: any) {
       setError(e.message)
       setIsSubmitting(false)
@@ -37,7 +43,7 @@ export default function LoginPage() {
           <div className="flex flex-col items-center mb-8">
             <div className="relative mb-4 group select-none">
               <div className="relative bg-[#14161f] border border-white/10 p-3 w-20 h-20 rounded-2xl flex items-center justify-center shadow-lg">
-                <img src="/IB_LOGO.png" alt="Logo" className="h-14 w-auto object-contain" />
+                <img src="/IB_LOGO.png" alt="Logo" className="max-h-full max-w-full object-contain" />
               </div>
             </div>
             
