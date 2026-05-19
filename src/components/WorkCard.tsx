@@ -229,9 +229,8 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
         )}
       </div>
 
-      {/* Roster & Member Details (Creator and Assignee) */}
       <div className="mt-4 pt-4 border-t border-white/5 space-y-2">
-        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[10px] text-muted-foreground">
           {/* Creator */}
           <div className="flex items-center gap-1.5">
             <span className="text-[9px] uppercase tracking-wider">Creator:</span>
@@ -266,7 +265,7 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
         </div>
 
         {/* Date Logged */}
-        <div className="text-[9px] text-muted-foreground flex justify-end">
+        <div className="text-[9px] text-muted-foreground flex justify-start">
           <span>Logged: <strong suppressHydrationWarning className="text-white/50">{new Date(work.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</strong></span>
         </div>
       </div>
@@ -392,7 +391,7 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
           )}
 
           {/* Quick status selector */}
-          <div className="flex flex-wrap items-center gap-1.5 justify-end">
+          <div className="flex flex-wrap items-center gap-1.5 justify-start">
             {/* Transition: Active */}
             {!isActive && !isCompleted && !isArchived && (
               <button 

@@ -175,13 +175,13 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
   return (
     <div className="space-y-6">
       {/* Top Scope Selector (Daily Focus Tab vs Global Pipeline Tab) */}
-      <div className="flex bg-[#09090b]/60 p-1.5 rounded-2xl border border-white/10 w-fit shrink-0 select-none">
+      <div className="flex w-full sm:w-fit bg-[#09090b]/60 p-1.5 rounded-2xl border border-white/10 select-none">
         <button
           onClick={() => {
             setActiveScope('all')
             setStatusFilter('ALL')
           }}
-          className={`relative px-4 py-2 text-xs font-black rounded-xl transition-all whitespace-nowrap cursor-pointer uppercase tracking-wider ${
+          className={`relative flex-1 sm:flex-initial px-2 sm:px-4 py-2 text-xs font-black rounded-xl transition-all whitespace-nowrap cursor-pointer uppercase tracking-wider ${
             activeScope === 'all' ? 'text-black z-10' : 'text-muted-foreground hover:text-white'
           }`}
         >
@@ -192,8 +192,9 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
               transition={{ type: "spring", stiffness: 380, damping: 30 }}
             />
           )}
-          <span className="relative z-10 flex items-center gap-1.5">
-            <FolderGit2 size={13} /> Global Workspace Wall
+          <span className="relative z-10 flex items-center justify-center gap-1.5">
+            <FolderGit2 size={13} />
+            <span><span className="hidden sm:inline">Global </span>Workspace Wall</span>
           </span>
         </button>
 
@@ -202,7 +203,7 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
             setActiveScope('focus')
             setStatusFilter('ALL')
           }}
-          className={`relative px-4 py-2 text-xs font-black rounded-xl transition-all whitespace-nowrap cursor-pointer uppercase tracking-wider ${
+          className={`relative flex-1 sm:flex-initial px-2 sm:px-4 py-2 text-xs font-black rounded-xl transition-all whitespace-nowrap cursor-pointer uppercase tracking-wider ${
             activeScope === 'focus' ? 'text-black z-10' : 'text-muted-foreground hover:text-white'
           }`}
         >
@@ -213,8 +214,9 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
               transition={{ type: "spring", stiffness: 380, damping: 30 }}
             />
           )}
-          <span className="relative z-10 flex items-center gap-1.5">
-            <User size={13} /> My Focus Area ({myWorkCount})
+          <span className="relative z-10 flex items-center justify-center gap-1.5">
+            <User size={13} />
+            <span>My Focus <span className="hidden sm:inline">Area</span> ({myWorkCount})</span>
           </span>
         </button>
       </div>

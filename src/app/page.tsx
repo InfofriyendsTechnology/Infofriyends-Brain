@@ -190,7 +190,7 @@ export default async function Home() {
   const session = await getSession()
 
   return (
-    <div className="space-y-8 pb-20 max-w-[1960px] mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+    <div className="space-y-8 pb-20 w-full px-4 sm:px-6 lg:px-12 pt-6">
       {session && <AddWorkModal user={session.user} />}
 
       {/* Header Banner (Instant Render) */}
@@ -204,7 +204,7 @@ export default async function Home() {
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#63BDF2]/10 border border-[#63BDF2]/20 text-xs font-semibold text-[#63BDF2] uppercase tracking-wider">
               <Terminal size={12} /> Live Workspace
             </div>
-            <h1 className="text-3xl md:text-5xl font-black tracking-tight text-white leading-tight">
+            <h1 className="text-2xl sm:text-3xl md:text-5xl font-black tracking-tight text-white leading-tight">
               Infofriyends <span className="bg-gradient-to-r from-[#63BDF2] to-[#3188DA] bg-clip-text text-transparent">Brain OS</span>
             </h1>
             <p className="text-muted-foreground text-sm md:text-base max-w-xl leading-relaxed">
@@ -233,14 +233,14 @@ export default async function Home() {
         {/* Left main section: Active Works Summary & Previews */}
         <div className="lg:col-span-8 space-y-8">
           <div className="bg-secondary/10 border border-border/30 rounded-3xl p-6 backdrop-blur-xl space-y-6">
-            <div className="flex justify-between items-center pb-4 border-b border-border/30">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border/30">
               <div className="flex items-center gap-2">
                 <FolderGit2 className="text-primary" size={20} />
                 <h2 className="text-lg font-bold text-white tracking-tight">Active Projects Overview</h2>
               </div>
               <Link 
                 href="/works"
-                className="flex items-center gap-1.5 text-xs font-bold text-primary hover:underline group"
+                className="flex items-center gap-1.5 text-xs font-bold text-primary hover:underline group shrink-0"
               >
                 Go to Work Wall <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
               </Link>

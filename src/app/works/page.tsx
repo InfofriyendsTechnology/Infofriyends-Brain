@@ -93,7 +93,7 @@ export default async function WorksPage() {
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#63BDF2]/10 border border-[#63BDF2]/20 text-xs font-semibold text-[#63BDF2] uppercase tracking-wider">
               <FolderGit2 size={12} /> Work Board
             </div>
-            <h1 className="text-3xl md:text-5xl font-black tracking-tight text-white leading-tight">
+            <h1 className="text-2xl sm:text-3xl md:text-5xl font-black tracking-tight text-white leading-tight">
               Work <span className="bg-gradient-to-r from-[#63BDF2] to-[#3188DA] bg-clip-text text-transparent">Wall</span>
             </h1>
             <p className="text-muted-foreground text-sm md:text-base max-w-xl leading-relaxed">

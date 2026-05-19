@@ -159,7 +159,7 @@ export default function HowItWorksDocs() {
   }
 
   return (
-    <div className="space-y-8 pb-20 max-w-[1960px] mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+    <div className="space-y-8 pb-20 w-full px-4 sm:px-6 lg:px-12 pt-6">
       {/* Banner */}
       <div className="relative overflow-hidden rounded-3xl border border-border/40 bg-gradient-to-br from-secondary/15 via-background to-secondary/10 p-6 md:p-8 backdrop-blur-xl">
         <div className="absolute top-0 right-0 w-80 h-80 bg-[#63BDF2]/10 rounded-full blur-[100px] pointer-events-none" />
@@ -170,7 +170,7 @@ export default function HowItWorksDocs() {
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#63BDF2]/10 border border-[#63BDF2]/20 text-xs font-semibold text-[#63BDF2] uppercase tracking-wider">
               <HelpCircle size={12} /> System Documentation
             </div>
-            <h1 className="text-3xl md:text-5xl font-black tracking-tight text-white leading-tight">
+            <h1 className="text-2xl sm:text-3xl md:text-5xl font-black tracking-tight text-white leading-tight">
               How It <span className="bg-gradient-to-r from-[#63BDF2] to-[#3188DA] bg-clip-text text-transparent">Works</span>
             </h1>
             <p className="text-muted-foreground text-sm md:text-base max-w-xl leading-relaxed">
