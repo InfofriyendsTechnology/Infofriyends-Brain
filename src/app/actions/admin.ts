@@ -70,17 +70,23 @@ export async function getMembers() {
   }
 }
 
-export async function updateMember(id: string, name: string, email: string, username: string, role: 'ADMIN' | 'MEMBER', score: number) {
+export async function updateMember(id: string, name: string, email: string, username: string, role: 'ADMIN' | 'MEMBER', score: number, password?: string) {
   try {
+    const updateData: any = {
+      name,
+      email,
+      username,
+      role,
+      contributionScore: score
+    }
+
+    if (password && password.trim() !== '') {
+      updateData.passwordHash = await hashPassword(password)
+    }
+
     await prisma.user.update({
       where: { id },
-      data: {
-        name,
-        email,
-        username,
-        role,
-        contributionScore: score
-      }
+      data: updateData
     })
     revalidatePath('/admin')
     return { success: true }

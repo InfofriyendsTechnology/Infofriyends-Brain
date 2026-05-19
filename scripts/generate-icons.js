@@ -18,7 +18,7 @@ async function generateIcons() {
     const canvas = new Jimp({
       width: canvasSize,
       height: canvasSize,
-      color: 0x00000000 // fully transparent
+      color: 0x09090bff // solid dark black background matching app theme (#09090b)
     });
     
     const x = Math.round((canvasSize - img.width) / 2);

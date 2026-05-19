@@ -90,9 +90,10 @@ export default function AdminDashboardClient({ initialMembers }: { initialMember
     const username = formData.get('username') as string
     const role = formData.get('role') as 'ADMIN' | 'MEMBER'
     const score = parseInt(formData.get('contributionScore') as string) || 0
+    const password = formData.get('password') as string
 
     try {
-      await updateMember(editingMember.id, name, email, username, role, score)
+      await updateMember(editingMember.id, name, email, username, role, score, password)
       setMembers(members.map(m => m.id === editingMember.id ? { ...m, name, email, username, role, contributionScore: score } : m))
       setEditingMember(null)
     } catch (err: any) {
@@ -531,6 +532,16 @@ export default function AdminDashboardClient({ initialMembers }: { initialMember
                     required
                     defaultValue={editingMember.contributionScore}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-[#63BDF2]"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-white/60 uppercase tracking-wider">Reset Password (Optional)</label>
+                  <input
+                    name="password"
+                    type="password"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-[#63BDF2]"
+                    placeholder="Enter new password to reset"
                   />
                 </div>
 
