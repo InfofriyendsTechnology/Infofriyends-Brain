@@ -3,13 +3,16 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import { ShieldAlert, ArrowRight, Activity, Loader2 } from 'lucide-react'
+import { ShieldAlert, ArrowRight, Activity, Loader2, Eye, EyeOff } from 'lucide-react'
 import { loginAction } from '@/app/actions/auth'
 
 export default function LoginPage() {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+
+  const [isRedirecting, setIsRedirecting] = useState(false)
 
   async function handleSubmit(formData: FormData) {
     setIsSubmitting(true)
@@ -17,6 +20,7 @@ export default function LoginPage() {
     try {
       const res = await loginAction(formData)
       if (res?.success) {
+        setIsRedirecting(true)
         router.push('/')
         router.refresh()
       } else {
@@ -83,22 +87,31 @@ export default function LoginPage() {
 
             <div className="space-y-2">
               <label className="text-xs font-bold text-white/70 uppercase tracking-wider block">Password</label>
-              <input
-                name="password"
-                type="password"
-                required
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:border-[#63BDF2] focus:ring-1 focus:ring-[#63BDF2]/30 transition-all font-medium"
-                placeholder="••••••••••••"
-              />
+              <div className="relative">
+                <input
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  className="w-full bg-white/5 border border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:border-[#63BDF2] focus:ring-1 focus:ring-[#63BDF2]/30 transition-all font-medium"
+                  placeholder="••••••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors p-1"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             {/* High-Contrast Connect Button (Text is Black on the gorgeous gradient for maximum legibility!) */}
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isRedirecting}
               className="w-full relative bg-gradient-to-r from-[#63BDF2] to-[#3188DA] text-black hover:opacity-95 py-3.5 rounded-xl font-black text-sm uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-6 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-black/20"
             >
-              {isSubmitting ? (
+              {isSubmitting || isRedirecting ? (
                 <span className="flex items-center justify-center gap-2 font-bold">
                   <Loader2 size={16} className="animate-spin" />
                   Connecting to Brain...
@@ -112,6 +125,44 @@ export default function LoginPage() {
           </form>
         </motion.div>
       </div>
+
+      {/* Holographic scanner redirect overlay to prevent feeling of freeze/hang */}
+      {isRedirecting && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#09090b]/90 backdrop-blur-xl"
+        >
+          <div className="relative flex flex-col items-center space-y-6">
+            {/* Holographic Glowing Scanner Outer Ring */}
+            <div className="relative w-24 h-24 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full border-2 border-[#63BDF2]/10" />
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-0 rounded-full border-2 border-t-[#63BDF2] border-r-transparent border-b-transparent border-l-transparent"
+              />
+              <motion.div
+                animate={{ rotate: -360 }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                className="absolute w-18 h-18 rounded-full border border-b-[#3188DA] border-t-transparent border-r-transparent border-l-transparent"
+              />
+              <Activity className="text-[#63BDF2] animate-pulse" size={32} />
+            </div>
+            
+            {/* Text HUD */}
+            <div className="text-center space-y-2 select-none">
+              <h2 className="text-md font-black text-white uppercase tracking-[0.25em] animate-pulse">
+                Access Granted
+              </h2>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center justify-center gap-1.5">
+                <Loader2 size={12} className="animate-spin text-[#63BDF2]" />
+                Initializing Brain OS...
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
     </div>
   )
 }
