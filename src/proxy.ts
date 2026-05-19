@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { decrypt } from '@/lib/auth'
 
-export default async function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const session = request.cookies.get('session')?.value
   
   // Public paths
@@ -36,6 +36,8 @@ export default async function proxy(request: NextRequest) {
 
   return NextResponse.next()
 }
+
+export default proxy
 
 export const config = {
   matcher: ['/((?!api|_next/static|_next/image|favicon.ico|manifest\\.json|sw\\.js|.*\\.png$|.*\\.svg$).*)'],

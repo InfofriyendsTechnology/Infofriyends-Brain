@@ -2,12 +2,13 @@
 
 import { usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
+import { useStore } from '@/store/useStore'
 
 export default function AppLayout({ children, session }: { children: React.ReactNode, session: any }) {
   const pathname = usePathname()
   const isLoginPage = pathname === '/login'
-
   const isChatPage = pathname === '/chat'
+  const { isNavbarHidden } = useStore()
 
   if (isLoginPage) {
     return (
@@ -19,11 +20,21 @@ export default function AppLayout({ children, session }: { children: React.React
     )
   }
 
+  // Compute responsive bottom padding class depending on navbar visibility and route
+  let mainPaddingClass = ''
+  if (isChatPage) {
+    mainPaddingClass = isNavbarHidden ? 'pb-6' : 'pb-24 lg:pb-6'
+  } else {
+    mainPaddingClass = isNavbarHidden ? 'pb-8 lg:pb-8' : 'pb-28 sm:pb-32 lg:pb-8'
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground h-[100dvh] overflow-hidden flex flex-col lg:flex-row">
       <Sidebar session={session} />
-      <main className={`flex-1 h-full lg:pl-72 ${isChatPage ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar pb-28 sm:pb-32'}`}>
-        {children}
+      <main className="flex-1 h-full lg:pl-72 overflow-hidden flex flex-col">
+        <div className={`flex-1 w-full h-full min-h-0 flex flex-col ${isChatPage ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar'} ${mainPaddingClass} transition-all duration-300`}>
+          {children}
+        </div>
       </main>
     </div>
   )

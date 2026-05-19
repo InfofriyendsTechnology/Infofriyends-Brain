@@ -1,7 +1,7 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { hashPassword } from '@/lib/auth'
+import { hashPassword } from '@/lib/password'
 import { revalidatePath } from 'next/cache'
 
 export async function createMember(formData: FormData) {
@@ -13,7 +13,7 @@ export async function createMember(formData: FormData) {
   const role = formData.get('role') as 'ADMIN' | 'MEMBER'
 
   if (!name || !email || !username || !password) {
-    throw new Error('Name, email, username and password are required')
+    return { success: false, error: 'Name, email, username and password are required' }
   }
 
   const passwordHash = await hashPassword(password)
@@ -33,9 +33,9 @@ export async function createMember(formData: FormData) {
     return { success: true, username, defaultPassword: password }
   } catch (error: any) {
     if (error.code === 'P2002') {
-      throw new Error('Email or username already exists')
+      return { success: false, error: 'Email or username already exists' }
     }
-    throw new Error('Failed to create member: ' + error.message)
+    return { success: false, error: 'Failed to create member: ' + error.message }
   }
 }
 
@@ -85,7 +85,7 @@ export async function updateMember(id: string, name: string, email: string, user
     revalidatePath('/admin')
     return { success: true }
   } catch (error: any) {
-    throw new Error('Failed to update member: ' + error.message)
+    return { success: false, error: 'Failed to update member: ' + error.message }
   }
 }
 
@@ -105,6 +105,6 @@ export async function deleteMember(id: string) {
     revalidatePath('/admin')
     return { success: true }
   } catch (error: any) {
-    throw new Error('Failed to delete member: ' + error.message)
+    return { success: false, error: 'Failed to delete member: ' + error.message }
   }
 }

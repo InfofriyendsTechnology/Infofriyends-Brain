@@ -156,8 +156,8 @@ export default function AdminDashboardClient({ initialMembers }: { initialMember
           />
         </div>
 
-        {/* Member Table View */}
-        <div className="border border-border/50 rounded-2xl overflow-hidden bg-background/30">
+        {/* Responsive Member View: Table on desktop, Cards on mobile */}
+        <div className="hidden md:block border border-border/50 rounded-2xl overflow-hidden bg-background/30">
           <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-sm text-left border-collapse">
               <thead>
@@ -258,6 +258,86 @@ export default function AdminDashboardClient({ initialMembers }: { initialMember
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* Mobile Roster Cards View */}
+        <div className="md:hidden space-y-4">
+          {filteredMembers.map((member) => (
+            <div key={member.id} className="bg-background/40 border border-border/80 rounded-2xl p-5 space-y-4 hover:border-border transition-all">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#63BDF2] to-[#3188DA] text-[#09090b] flex items-center justify-center font-black uppercase text-sm shadow-md">
+                  {member.name.charAt(0)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-bold text-white text-sm truncate">{member.name}</h4>
+                  <p className="text-[10px] text-muted-foreground">Joined {formatDate(member.createdAt)}</p>
+                </div>
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                  member.role === 'ADMIN' 
+                    ? 'bg-[#3188DA]/10 border border-[#3188DA]/20 text-[#3188DA]' 
+                    : 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+                }`}>
+                  {member.role === 'ADMIN' ? <ShieldCheck size={9} /> : <User size={9} />}
+                  {member.role}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 py-2 border-t border-b border-white/5 text-xs">
+                <div className="min-w-0">
+                  <span className="text-[9px] uppercase font-bold text-muted-foreground block mb-0.5">Username</span>
+                  <p className="font-mono text-white/90 truncate">{member.username}</p>
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[9px] uppercase font-bold text-muted-foreground block mb-0.5">Email</span>
+                  <p className="text-white/90 truncate" title={member.email}>{member.email}</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="inline-flex items-center gap-1 bg-[#63BDF2]/5 border border-[#63BDF2]/15 px-2.5 py-1 rounded-lg text-xs font-bold text-white">
+                  <Award size={12} className="text-[#63BDF2]" />
+                  <span>{member.contributionScore} PTS</span>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setInspectingMember(member)}
+                    className="p-2 text-muted-foreground hover:text-[#63BDF2] hover:bg-[#63BDF2]/10 rounded-xl transition-all cursor-pointer"
+                    title="View Profile"
+                  >
+                    <Eye size={15} />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setEditError(null)
+                      setEditingMember(member)
+                    }}
+                    className="p-2 text-muted-foreground hover:text-[#63BDF2] hover:bg-[#63BDF2]/10 rounded-xl transition-all cursor-pointer"
+                    title="Edit Member"
+                  >
+                    <Edit3 size={15} />
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setDeleteError(null)
+                      setDeletingMember(member)
+                    }}
+                    className="p-2 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all cursor-pointer"
+                    title="Delete Member"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {filteredMembers.length === 0 && (
+            <div className="p-8 text-center text-muted-foreground text-xs bg-background/30 border border-border/50 rounded-2xl">
+              No matching team members found.
+            </div>
+          )}
         </div>
       </div>
 

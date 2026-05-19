@@ -1,7 +1,8 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { hashPassword, verifyPassword, login, logout } from '@/lib/auth'
+import { login, logout } from '@/lib/auth'
+import { hashPassword, verifyPassword } from '@/lib/password'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, MessageSquare, ShieldCheck, User, Users, Clock, Sparkles, Plus, Hash, FolderGit2, X, AlertCircle, Loader2 } from 'lucide-react'
+import { Send, MessageSquare, ShieldCheck, User, Users, Clock, Sparkles, Plus, Hash, FolderGit2, X, AlertCircle, Loader2, Menu } from 'lucide-react'
 import { sendChatMessage, createChatChannel, setUserTyping, syncChatroom, touchUserHeartbeat } from '@/app/actions/chat'
 
 interface Channel {
@@ -48,6 +48,7 @@ export default function ChatClient({
   const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [inputText, setInputText] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false)
   
   // Sync channels from server when initialChannels loads/changes (prevents empty boot lag!)
   useEffect(() => {
@@ -236,12 +237,20 @@ export default function ChatClient({
     
     return `Active ${new Date(m.lastActive).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
   }
-
   return (
     <div className="flex-1 flex bg-[#0c0d12]/40 border border-white/10 rounded-3xl overflow-hidden backdrop-blur-xl h-full shadow-2xl relative select-none">
-      
+      {/* Backdrop overlay for mobile sidebar */}
+      {showMobileSidebar && (
+        <div 
+          onClick={() => setShowMobileSidebar(false)}
+          className="absolute inset-0 z-20 bg-black/60 md:hidden transition-opacity"
+        />
+      )}
+
       {/* ================= SIDEBAR: CHANNELS & MEMBERS ================= */}
-      <div className="w-80 border-r border-white/10 bg-[#09090b]/80 flex flex-col shrink-0">
+      <div className={`absolute md:static inset-y-0 left-0 z-30 w-80 bg-[#09090b] md:bg-[#09090b]/80 border-r border-white/10 flex flex-col shrink-0 transition-transform duration-300 transform ${
+        showMobileSidebar ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+      }`}>
         
         {/* Workspace Brand Hub */}
         <div className="p-5 border-b border-white/5 flex items-center justify-between">
@@ -255,13 +264,22 @@ export default function ChatClient({
             </div>
           </div>
 
-          <button 
-            onClick={() => setShowCreateModal(true)}
-            className="p-1.5 bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 text-white rounded-lg transition-all cursor-pointer"
-            title="Create Group Chat"
-          >
-            <Plus size={14} />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button 
+              onClick={() => setShowCreateModal(true)}
+              className="p-1.5 bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 text-white rounded-lg transition-all cursor-pointer"
+              title="Create Group Chat"
+            >
+              <Plus size={14} />
+            </button>
+            <button 
+              onClick={() => setShowMobileSidebar(false)}
+              className="md:hidden p-1.5 bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 text-white rounded-lg transition-all cursor-pointer"
+              title="Close Sidebar"
+            >
+              <X size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Channels List Pane */}
@@ -278,7 +296,10 @@ export default function ChatClient({
                 return (
                   <button
                     key={channel.id}
-                    onClick={() => setActiveChannel(channel)}
+                    onClick={() => {
+                      setActiveChannel(channel)
+                      setShowMobileSidebar(false)
+                    }}
                     className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-bold transition-all border cursor-pointer select-none ${
                       isActive 
                         ? 'bg-[#63BDF2]/10 border-[#63BDF2]/20 text-[#63BDF2]' 
@@ -304,7 +325,10 @@ export default function ChatClient({
                 return (
                   <button
                     key={channel.id}
-                    onClick={() => setActiveChannel(channel)}
+                    onClick={() => {
+                      setActiveChannel(channel)
+                      setShowMobileSidebar(false)
+                    }}
                     className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-bold transition-all border cursor-pointer select-none ${
                       isActive 
                         ? 'bg-[#63BDF2]/10 border-[#63BDF2]/20 text-[#63BDF2]' 
@@ -365,18 +389,27 @@ export default function ChatClient({
         {/* Header HUD */}
         {activeChannel && (
           <div className="px-6 py-4 border-b border-white/10 bg-[#0d0e12]/60 flex items-center justify-between gap-4 relative z-10 shrink-0">
-            <div>
-              <h1 className="text-sm font-bold text-white flex items-center gap-2">
-                {activeChannel.isProject ? <FolderGit2 size={14} className="text-[#63BDF2]" /> : <Hash size={14} className="text-[#63BDF2]" />}
-                {activeChannel.name}
-              </h1>
-              <p className="text-[10px] text-muted-foreground mt-0.5 truncate max-w-md">
-                {activeChannel.description || 'Welcome to this workspace conversation lounge.'}
-              </p>
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                onClick={() => setShowMobileSidebar(true)}
+                className="md:hidden p-2 text-muted-foreground hover:text-white rounded-xl bg-white/5 border border-white/10 shrink-0 cursor-pointer"
+                title="Toggle Channels Menu"
+              >
+                <Menu size={16} />
+              </button>
+              <div className="min-w-0">
+                <h1 className="text-sm font-bold text-white flex items-center gap-2 leading-none mb-1">
+                  {activeChannel.isProject ? <FolderGit2 size={14} className="text-[#63BDF2] shrink-0" /> : <Hash size={14} className="text-[#63BDF2] shrink-0" />}
+                  <span className="truncate">{activeChannel.name}</span>
+                </h1>
+                <p className="text-[10px] text-muted-foreground truncate max-w-[150px] sm:max-w-md">
+                  {activeChannel.description || 'Welcome to this workspace conversation lounge.'}
+                </p>
+              </div>
             </div>
             
             {/* Live Indicator pill */}
-            <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1 rounded-full text-[8px] font-bold text-emerald-400 uppercase tracking-wider animate-pulse">
+            <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1 rounded-full text-[8px] font-bold text-emerald-400 uppercase tracking-wider animate-pulse shrink-0">
               ● Active Sync
             </div>
           </div>

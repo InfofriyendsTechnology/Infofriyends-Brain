@@ -172,8 +172,8 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
             })}
           </div>
 
-          {/* View Toggles (Grid vs Table) */}
-          <div className="flex bg-[#09090b]/60 p-1 rounded-xl border border-white/10 shrink-0 select-none">
+          {/* View Toggles (Grid vs Table) - Hidden on Mobile */}
+          <div className="hidden md:flex bg-[#09090b]/60 p-1 rounded-xl border border-white/10 shrink-0 select-none">
             <button
               onClick={() => setViewMode('grid')}
               className={`p-1.5 rounded-lg transition-all cursor-pointer ${
@@ -211,86 +211,94 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
             <p className="text-xs text-muted-foreground max-w-xs mx-auto">Try refining your keyword search or select a different status filter tab.</p>
           </div>
         </motion.div>
-      ) : viewMode === 'grid' ? (
-        <motion.div 
-          layout
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-        >
-          <AnimatePresence mode="popLayout">
-            {filteredWorks.map(work => (
-              <WorkCard key={work.id} work={work} currentUser={currentUser} />
-            ))}
-          </AnimatePresence>
-        </motion.div>
       ) : (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="border border-white/10 rounded-3xl overflow-hidden bg-background/30 backdrop-blur-xl"
-        >
-          <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-sm text-left border-collapse">
-              <thead>
-                <tr className="bg-secondary/40 text-muted-foreground border-b border-white/5 text-[10px] font-bold uppercase tracking-wider">
-                  <th className="px-6 py-4">Task / Project</th>
-                  <th className="px-6 py-4">Creator</th>
-                  <th className="px-6 py-4 text-center">Status</th>
-                  <th className="px-6 py-4 text-right">Value</th>
-                  {currentUser?.role === 'ADMIN' && <th className="px-6 py-4 text-right">Admin Actions</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5 text-xs">
-                {filteredWorks.map((work) => (
-                  <tr key={work.id} className="hover:bg-secondary/15 transition-all">
-                    {/* Task details */}
-                    <td className="px-6 py-4 max-w-sm">
-                      <p className={`font-bold text-white mb-1 ${work.status === 'Completed' || work.status === 'Archived' ? 'line-through text-muted-foreground' : ''}`}>{work.name}</p>
-                      <p className="text-[10px] text-muted-foreground line-clamp-1">{work.description}</p>
-                    </td>
-
-                    {/* Creator */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        {work.creator?.profilePhoto ? (
-                          <img src={work.creator.profilePhoto} alt={work.creator.name} className="w-6 h-6 rounded-full object-cover border border-white/10" />
-                        ) : (
-                          <div className="w-6 h-6 rounded-full bg-[#63BDF2]/20 text-[#63BDF2] flex items-center justify-center font-bold text-[9px] uppercase">
-                            {work.creator?.name ? work.creator.name.charAt(0) : '?'}
-                          </div>
-                        )}
-                        <span className="font-semibold text-white/95">{work.creator?.name || 'Unknown'}</span>
-                      </div>
-                    </td>
-
-                    {/* Status badge */}
-                    <td className="px-6 py-4 text-center">
-                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                        work.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                        work.status === 'Pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse' :
-                        work.status === 'Archived' ? 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20' :
-                        'bg-[#63BDF2]/10 text-[#63BDF2] border border-[#63BDF2]/20'
-                      }`}>
-                        {work.status}
-                      </span>
-                    </td>
-
-                    {/* Rewards value */}
-                    <td className="px-6 py-4 text-right font-bold text-[#63BDF2] font-mono">
-                      +{work.points || 10} PTS
-                    </td>
-
-                    {/* Admin Actions */}
-                    {currentUser?.role === 'ADMIN' && (
-                      <td className="px-6 py-4 text-right">
-                        <TableRowAdminActions work={work} />
-                      </td>
-                    )}
-                  </tr>
+        <>
+          {/* Grid View (Visible on Mobile, or when viewMode is 'grid' on Desktop) */}
+          <div className={viewMode === 'grid' ? 'block' : 'block md:hidden'}>
+            <motion.div 
+              layout
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            >
+              <AnimatePresence mode="popLayout">
+                {filteredWorks.map(work => (
+                  <WorkCard key={work.id} work={work} currentUser={currentUser} />
                 ))}
-              </tbody>
-            </table>
+              </AnimatePresence>
+            </motion.div>
           </div>
-        </motion.div>
+
+          {/* Table View (Desktop Only when viewMode is 'table') */}
+          {viewMode === 'table' && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="hidden md:block border border-white/10 rounded-3xl overflow-hidden bg-background/30 backdrop-blur-xl"
+            >
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-sm text-left border-collapse">
+                  <thead>
+                    <tr className="bg-secondary/40 text-muted-foreground border-b border-white/5 text-[10px] font-bold uppercase tracking-wider">
+                      <th className="px-6 py-4">Task / Project</th>
+                      <th className="px-6 py-4">Creator</th>
+                      <th className="px-6 py-4 text-center">Status</th>
+                      <th className="px-6 py-4 text-right">Value</th>
+                      {currentUser?.role === 'ADMIN' && <th className="px-6 py-4 text-right">Admin Actions</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 text-xs">
+                    {filteredWorks.map((work) => (
+                      <tr key={work.id} className="hover:bg-secondary/15 transition-all">
+                        {/* Task details */}
+                        <td className="px-6 py-4 max-w-sm">
+                          <p className={`font-bold text-white mb-1 ${work.status === 'Completed' || work.status === 'Archived' ? 'line-through text-muted-foreground' : ''}`}>{work.name}</p>
+                          <p className="text-[10px] text-muted-foreground line-clamp-1">{work.description}</p>
+                        </td>
+
+                        {/* Creator */}
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            {work.creator?.profilePhoto ? (
+                              <img src={work.creator.profilePhoto} alt={work.creator.name} className="w-6 h-6 rounded-full object-cover border border-white/10" />
+                            ) : (
+                              <div className="w-6 h-6 rounded-full bg-[#63BDF2]/20 text-[#63BDF2] flex items-center justify-center font-bold text-[9px] uppercase">
+                                {work.creator?.name ? work.creator.name.charAt(0) : '?'}
+                              </div>
+                            )}
+                            <span className="font-semibold text-white/95">{work.creator?.name || 'Unknown'}</span>
+                          </div>
+                        </td>
+
+                        {/* Status badge */}
+                        <td className="px-6 py-4 text-center">
+                          <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                            work.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                            work.status === 'Pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse' :
+                            work.status === 'Archived' ? 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20' :
+                            'bg-[#63BDF2]/10 text-[#63BDF2] border border-[#63BDF2]/20'
+                          }`}>
+                            {work.status}
+                          </span>
+                        </td>
+
+                        {/* Rewards value */}
+                        <td className="px-6 py-4 text-right font-bold text-[#63BDF2] font-mono">
+                          +{work.points || 10} PTS
+                        </td>
+
+                        {/* Admin Actions */}
+                        {currentUser?.role === 'ADMIN' && (
+                          <td className="px-6 py-4 text-right">
+                            <TableRowAdminActions work={work} />
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </motion.div>
+          )}
+        </>
       )}
     </div>
   )

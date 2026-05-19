@@ -4,7 +4,7 @@ export default function ChatLoading() {
       <div className="flex-1 flex bg-[#0c0d12]/40 border border-white/10 rounded-3xl overflow-hidden backdrop-blur-xl h-full shadow-2xl relative">
         
         {/* Sidebar Skeleton */}
-        <div className="w-80 border-r border-white/10 bg-[#09090b]/80 flex flex-col shrink-0">
+        <div className="hidden md:flex w-80 border-r border-white/10 bg-[#09090b]/80 flex-col shrink-0">
           <div className="p-5 border-b border-white/5 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl bg-white/5" />

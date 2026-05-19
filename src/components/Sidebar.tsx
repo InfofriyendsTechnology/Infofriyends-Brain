@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LayoutDashboard, Briefcase, Shield, LogOut, Plus, User, HelpCircle, MessageSquare } from 'lucide-react'
+import { LayoutDashboard, Briefcase, Shield, LogOut, Plus, User, HelpCircle, MessageSquare, MoreHorizontal, EyeOff, ChevronUp } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { logoutAction } from '@/app/actions/auth'
 import { useState, useEffect } from 'react'
@@ -11,9 +11,10 @@ import { useState, useEffect } from 'react'
 export default function Sidebar({ session }: { session: any }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { setAddWorkModalOpen } = useStore()
+  const { setAddWorkModalOpen, isNavbarHidden, setNavbarHidden } = useStore()
   const [greeting, setGreeting] = useState('Hey')
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
 
   useEffect(() => {
     const hour = new Date().getHours()
@@ -132,88 +133,168 @@ export default function Sidebar({ session }: { session: any }) {
       </aside>
 
       {/* ================= MOBILE BOTTOM NAVIGATION ================= */}
-      <nav className="lg:hidden fixed bottom-4 left-4 right-4 z-40 bg-background/85 border border-border/80 rounded-2xl p-2 backdrop-blur-xl shadow-[0_4px_30px_rgba(0,0,0,0.4)] flex justify-around items-center h-16">
+      {/* Floating Restore Button when navigation bar is hidden */}
+      {isNavbarHidden && (
+        <button
+          onClick={() => setNavbarHidden(false)}
+          className="lg:hidden fixed bottom-4 right-4 z-50 bg-background/90 border border-border/80 p-3 rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.5)] text-[#63BDF2] hover:text-white hover:bg-secondary/20 transition-all cursor-pointer flex items-center justify-center animate-bounce"
+          title="Show Navigation Bar"
+        >
+          <ChevronUp size={20} />
+        </button>
+      )}
+
+      {/* Submenu Popover for Extra Items */}
+      <AnimatePresence>
+        {showMoreMenu && !isNavbarHidden && (
+          <>
+            {/* Click-away backdrop to close popover */}
+            <div 
+              onClick={() => setShowMoreMenu(false)}
+              className="lg:hidden fixed inset-0 z-30"
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 15, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 15, scale: 0.95 }}
+              className="lg:hidden fixed bottom-24 right-4 z-40 w-56 bg-background/95 border border-border/80 rounded-2xl p-2.5 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] flex flex-col gap-1 select-none"
+            >
+              {/* Extra Items for Admin vs Member */}
+              {session?.user?.role === 'ADMIN' && (
+                <Link
+                  href="/profile"
+                  onClick={() => setShowMoreMenu(false)}
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                    pathname === '/profile' ? 'text-[#63BDF2] bg-[#63BDF2]/10' : 'text-muted-foreground hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <User size={16} />
+                  <span>Profile Settings</span>
+                </Link>
+              )}
+
+              <Link
+                href="/docs"
+                onClick={() => setShowMoreMenu(false)}
+                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  pathname === '/docs' ? 'text-[#63BDF2] bg-[#63BDF2]/10' : 'text-muted-foreground hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <HelpCircle size={16} />
+                <span>How It Works</span>
+              </Link>
+
+              <button
+                onClick={() => {
+                  setShowMoreMenu(false)
+                  setNavbarHidden(true)
+                }}
+                className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-muted-foreground hover:text-white hover:bg-white/5 transition-all text-left cursor-pointer"
+              >
+                <EyeOff size={16} />
+                <span>Hide Navigation Bar</span>
+              </button>
+
+              {session ? (
+                <button
+                  onClick={() => {
+                    setShowMoreMenu(false)
+                    setShowLogoutConfirm(true)
+                  }}
+                  className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all text-left cursor-pointer border-t border-white/5 mt-1 pt-2.5"
+                >
+                  <LogOut size={16} />
+                  <span>Logout</span>
+                </button>
+              ) : (
+                <Link
+                  href="/login"
+                  onClick={() => setShowMoreMenu(false)}
+                  className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-[#63BDF2] hover:text-white hover:bg-[#63BDF2]/10 transition-all border-t border-white/5 mt-1 pt-2.5"
+                >
+                  <User size={16} />
+                  <span>Login</span>
+                </Link>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      <nav className={`lg:hidden fixed bottom-4 left-2 right-2 min-[400px]:left-4 min-[400px]:right-4 z-40 bg-background/85 border border-border/80 rounded-2xl p-1.5 backdrop-blur-xl shadow-[0_4px_30px_rgba(0,0,0,0.4)] flex justify-around items-center h-16 transition-all duration-300 ${
+        isNavbarHidden ? 'translate-y-28 opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
+      }`}>
+        {/* Button 1: Home */}
         <Link 
           href="/" 
-          className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all ${
-            pathname === '/' ? 'text-[#63BDF2]' : 'text-muted-foreground'
+          onClick={() => setShowMoreMenu(false)}
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all w-14 ${
+            pathname === '/' ? 'text-[#63BDF2]' : 'text-muted-foreground hover:text-white'
           }`}
         >
-          <LayoutDashboard size={20} />
-          <span className="text-[8px] font-bold mt-1">Home</span>
+          <LayoutDashboard size={18} />
+          <span className="text-[7.5px] min-[360px]:text-[8px] font-bold mt-1 tracking-tight truncate w-full text-center">Home</span>
         </Link>
 
+        {/* Button 2: Works */}
         <Link 
           href="/works" 
-          className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all ${
-            pathname === '/works' ? 'text-[#63BDF2]' : 'text-muted-foreground'
+          onClick={() => setShowMoreMenu(false)}
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all w-14 ${
+            pathname === '/works' ? 'text-[#63BDF2]' : 'text-muted-foreground hover:text-white'
           }`}
         >
-          <Briefcase size={20} />
-          <span className="text-[8px] font-bold mt-1">Works</span>
+          <Briefcase size={18} />
+          <span className="text-[7.5px] min-[360px]:text-[8px] font-bold mt-1 tracking-tight truncate w-full text-center">Works</span>
         </Link>
 
+        {/* Button 3: Chat */}
         <Link 
           href="/chat" 
-          className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all ${
-            pathname === '/chat' ? 'text-[#63BDF2]' : 'text-muted-foreground'
+          onClick={() => setShowMoreMenu(false)}
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all w-14 ${
+            pathname === '/chat' ? 'text-[#63BDF2]' : 'text-muted-foreground hover:text-white'
           }`}
         >
-          <MessageSquare size={20} />
-          <span className="text-[8px] font-bold mt-1">Chat</span>
+          <MessageSquare size={18} />
+          <span className="text-[7.5px] min-[360px]:text-[8px] font-bold mt-1 tracking-tight truncate w-full text-center">Chat</span>
         </Link>
 
-        {session?.user?.role === 'ADMIN' && (
+        {/* Button 4: Admin Panel (if Admin) or Profile Settings (if Member) */}
+        {session?.user?.role === 'ADMIN' ? (
           <Link 
             href="/admin" 
-            className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all ${
-              pathname === '/admin' ? 'text-[#63BDF2]' : 'text-muted-foreground'
+            onClick={() => setShowMoreMenu(false)}
+            className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all w-14 ${
+              pathname === '/admin' ? 'text-[#63BDF2]' : 'text-muted-foreground hover:text-white'
             }`}
           >
-            <Shield size={20} />
-            <span className="text-[8px] font-bold mt-1">Admin</span>
+            <Shield size={18} />
+            <span className="text-[7.5px] min-[360px]:text-[8px] font-bold mt-1 tracking-tight truncate w-full text-center">Admin</span>
           </Link>
-        )}
-
-        <Link 
-          href="/profile" 
-          className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all ${
-            pathname === '/profile' ? 'text-[#63BDF2]' : 'text-muted-foreground'
-          }`}
-        >
-          <User size={20} />
-          <span className="text-[8px] font-bold mt-1">Profile</span>
-        </Link>
-
-        <Link 
-          href="/docs" 
-          className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all ${
-            pathname === '/docs' ? 'text-[#63BDF2]' : 'text-muted-foreground'
-          }`}
-        >
-          <HelpCircle size={20} />
-          <span className="text-[8px] font-bold mt-1">Docs</span>
-        </Link>
-
-        {session ? (
-          <button 
-            onClick={() => setShowLogoutConfirm(true)}
-            className="flex flex-col items-center justify-center p-2 rounded-xl text-muted-foreground hover:text-destructive transition-all cursor-pointer"
-          >
-            <div className="w-5 h-5 rounded-full bg-[#63BDF2]/20 text-[#63BDF2] flex items-center justify-center font-bold text-xs uppercase">
-              {session.user.name.charAt(0)}
-            </div>
-            <span className="text-[8px] font-bold mt-1">Logout</span>
-          </button>
         ) : (
           <Link 
-            href="/login" 
-            className="flex flex-col items-center justify-center p-2 rounded-xl text-muted-foreground hover:text-white transition-all"
+            href="/profile" 
+            onClick={() => setShowMoreMenu(false)}
+            className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all w-14 ${
+              pathname === '/profile' ? 'text-[#63BDF2]' : 'text-muted-foreground hover:text-white'
+            }`}
           >
-            <User size={20} />
-            <span className="text-[8px] font-bold mt-1">Login</span>
+            <User size={18} />
+            <span className="text-[7.5px] min-[360px]:text-[8px] font-bold mt-1 tracking-tight truncate w-full text-center">Profile</span>
           </Link>
         )}
+
+        {/* Button 5: More (Submenu toggle) */}
+        <button 
+          onClick={() => setShowMoreMenu(!showMoreMenu)}
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer w-14 ${
+            showMoreMenu ? 'text-[#63BDF2]' : 'text-muted-foreground hover:text-white'
+          }`}
+        >
+          <MoreHorizontal size={18} />
+          <span className="text-[7.5px] min-[360px]:text-[8px] font-bold mt-1 tracking-tight truncate w-full text-center">More</span>
+        </button>
       </nav>
 
       {/* Premium Custom Logout Confirmation Modal */}
