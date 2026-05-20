@@ -9,12 +9,6 @@ async function logActivity(action: string, userId: string, workId?: string, deta
   await prisma.activityLog.create({
     data: { action, details, workId, userId }
   })
-  
-  // Increment contribution score
-  await prisma.user.update({
-    where: { id: userId },
-    data: { contributionScore: { increment: 1 } }
-  })
 }
 
 // Work Actions
@@ -50,8 +44,7 @@ export async function createWork(formData: FormData) {
         priority,
         dueDate,
         creatorId: user.id,
-        assigneeId: assigneeId || null,
-        points: 10
+        assigneeId: assigneeId || null
       },
     })
     
@@ -119,7 +112,7 @@ export async function editWork(id: string, formData: FormData) {
   }
 }
 
-export async function updateWorkStatus(id: string, newStatus: string, customPoints?: number, blockedReason?: string) {
+export async function updateWorkStatus(id: string, newStatus: string, blockedReason?: string) {
   const session = await getSession()
   if (!session) return { success: false, error: 'Unauthorized' }
   const user = session.user
@@ -134,38 +127,21 @@ export async function updateWorkStatus(id: string, newStatus: string, customPoin
       return { success: false, error: 'You are not authorized to update this work item' }
     }
 
-    const finalPoints = customPoints !== undefined ? Math.max(0, Math.floor(Number(customPoints))) : work.points
-    const isNowCompleted = newStatus === 'COMPLETED'
-    const wasCompleted = work.status === 'COMPLETED'
     const isEditedByAdmin = user.role === 'ADMIN' && work.creatorId !== user.id
 
-    // Update status, points, and blockedReason if BLOCKED
+    // Update status and blockedReason if BLOCKED/DELETED
     await prisma.work.update({
       where: { id },
       data: { 
         status: newStatus,
-        points: finalPoints,
-        blockedReason: newStatus === 'BLOCKED' ? (blockedReason || 'No reason provided') : null,
+        blockedReason: (newStatus === 'BLOCKED' || newStatus === 'DELETED') ? (blockedReason || 'No reason provided') : null,
         ...(isEditedByAdmin && {
           originalOwnerId: work.creatorId,
           editedByAdminId: user.id,
-          editReason: `Status changed to ${newStatus} by admin with points = ${finalPoints}`,
+          editReason: `Status changed to ${newStatus} by admin`,
         })
       },
     })
-
-    // Score Logic: Creator gets finalPoints on completion, lost if marked back
-    if (isNowCompleted && !wasCompleted) {
-      await prisma.user.update({
-        where: { id: work.creatorId },
-        data: { contributionScore: { increment: finalPoints } }
-      })
-    } else if (!isNowCompleted && wasCompleted) {
-      await prisma.user.update({
-        where: { id: work.creatorId },
-        data: { contributionScore: { decrement: work.points } }
-      })
-    }
 
     // Log the action
     let logMsg = `Status changed to ${newStatus}.`
@@ -228,6 +204,12 @@ export async function getWorks() {
             user: { select: { name: true } }
           },
           orderBy: { createdAt: 'desc' }
+        },
+        reviews: {
+          include: {
+            reviewer: { select: { id: true, name: true, profilePhoto: true } }
+          },
+          orderBy: { createdAt: 'desc' }
         }
       },
       orderBy: { createdAt: 'desc' },
@@ -236,6 +218,48 @@ export async function getWorks() {
   } catch (error) {
     console.error('Failed to fetch works:', error)
     return []
+  }
+}
+// Work Reviews
+export async function submitWorkReview(workId: string, rating: number, feedback?: string) {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Unauthorized' }
+  const user = session.user
+
+  if (rating < 1 || rating > 5) return { success: false, error: 'Rating must be between 1 and 5' }
+
+  try {
+    const work = await prisma.work.findUnique({ where: { id: workId } })
+    if (!work) return { success: false, error: 'Work not found' }
+    if (work.status !== 'COMPLETED') return { success: false, error: 'Can only rate completed works' }
+    
+    // Check if already rated
+    const existingReview = await prisma.workReview.findUnique({
+      where: { workId_reviewerId: { workId, reviewerId: user.id } }
+    })
+
+    if (existingReview) {
+      return { success: false, error: 'You have already reviewed this work' }
+    }
+
+    await prisma.workReview.create({
+      data: {
+        workId,
+        reviewerId: user.id,
+        rating,
+        feedback
+      }
+    })
+
+    await logActivity('REVIEWED_WORK', user.id, workId, `Rated work ${rating} stars.`)
+    
+    revalidatePath('/')
+    revalidatePath('/works')
+    revalidatePath('/members')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to submit review:', error)
+    return { success: false, error: `Database error: ${error.message || error}` }
   }
 }
 

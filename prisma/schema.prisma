@@ -27,7 +27,6 @@ model User {
   passwordHash      String
   role              Role     @default(MEMBER)
   profilePhoto      String?
-  contributionScore Int      @default(0)
   lastActive        DateTime? @default(now())
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -43,6 +42,7 @@ model User {
   chatMessages      ChatMessage[]
   typingStates      TypingState[]
   ideaSupports      IdeaSupport[]
+  workReviews       WorkReview[]
 }
 
 model Work {
@@ -53,7 +53,6 @@ model Work {
   priority        String   @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
   dueDate         DateTime?
   blockedReason   String?  @db.Text
-  points          Int      @default(10)
   
   // Relations
   creatorId       String
@@ -77,6 +76,7 @@ model Work {
   updatedAt       DateTime @updatedAt
 
   activityLogs    ActivityLog[]
+  reviews         WorkReview[]
 }
 
 model ActivityLog {
@@ -163,4 +163,20 @@ model IdeaSupport {
   createdAt DateTime @default(now())
 
   @@unique([workId, userId])
+}
+
+model WorkReview {
+  id        String   @id @default(cuid())
+  rating    Int      // 1 to 5 stars
+  feedback  String?  @db.Text
+  
+  workId    String
+  work      Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
+  
+  reviewerId String
+  reviewer   User    @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+
+  @@unique([workId, reviewerId])
 }

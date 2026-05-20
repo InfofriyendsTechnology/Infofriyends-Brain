@@ -70,10 +70,10 @@ async function MemberActivitySection() {
                 </div>
               </div>
 
-              {/* Score Badge */}
+              {/* Rating Badge */}
               <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 text-center shrink-0">
-                <span className="text-lg font-black text-amber-400 block leading-none">{member.contributionScore}</span>
-                <span className="text-[8px] uppercase tracking-wider text-amber-400/60 font-bold">Points</span>
+                <span className="text-lg font-black text-amber-400 block leading-none">{Number(member.averageRating || 0).toFixed(1)} <span className="text-sm">⭐</span></span>
+                <span className="text-[8px] uppercase tracking-wider text-amber-400/60 font-bold">Avg Rating</span>
               </div>
             </div>
 
@@ -131,6 +131,37 @@ async function MemberActivitySection() {
                     <span className="text-[9px] px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-zinc-500 font-bold">
                       +{createdWorks.length - 5} more
                     </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Peer Reviews / Proof Analytics */}
+            {completedWorks.some(w => w.reviews?.length > 0) && (
+              <div className="space-y-1.5 pt-2 border-t border-white/5">
+                <span className="text-[9px] uppercase font-bold text-amber-500/80 tracking-wider flex items-center gap-1">
+                  <Lightbulb size={10} /> Peer Reviews & Proof
+                </span>
+                <div className="space-y-1">
+                  {completedWorks.flatMap(w => w.reviews || []).slice(0, 3).map((r: any, idx: number) => (
+                    <div key={idx} className="bg-white/5 rounded-lg px-2.5 py-2 text-xs">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[10px] text-muted-foreground font-semibold">Reviewer Rating:</span>
+                        <div className="flex text-amber-400 text-[8px]">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <span key={i} className={i < r.rating ? "opacity-100" : "opacity-30"}>★</span>
+                          ))}
+                        </div>
+                      </div>
+                      {r.feedback && (
+                        <p className="text-white/80 italic text-[11px] leading-relaxed">"{r.feedback}"</p>
+                      )}
+                    </div>
+                  ))}
+                  {completedWorks.flatMap(w => w.reviews || []).length > 3 && (
+                    <div className="text-[9px] text-muted-foreground font-semibold text-center pt-1">
+                      +{completedWorks.flatMap(w => w.reviews || []).length - 3} more reviews
+                    </div>
                   )}
                 </div>
               </div>

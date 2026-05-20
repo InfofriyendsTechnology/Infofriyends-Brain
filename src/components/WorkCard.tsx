@@ -1,7 +1,7 @@
 'use client'
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { updateWorkStatus, addWorkUpdate, editWork } from '@/app/actions'
+import { updateWorkStatus, addWorkUpdate, editWork, submitWorkReview } from '@/app/actions'
 import { useState } from 'react'
 import { 
   CheckCircle2, Circle, Archive, Clock, ShieldAlert, Sparkles, 
@@ -26,6 +26,10 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
   const [showDeleteInput, setShowDeleteInput] = useState(false)
   const [deleteReason, setDeleteReason] = useState('')
 
+  // Review State
+  const [rating, setRating] = useState(0)
+  const [feedback, setFeedback] = useState('')
+
   const isCompleted = work.status === 'COMPLETED'
   const isArchived = work.status === 'ARCHIVED'
   const isBlocked = work.status === 'BLOCKED'
@@ -33,15 +37,17 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
   const isActive = work.status === 'ACTIVE'
   const isDeleted = work.status === 'DELETED'
 
+  const hasRated = work.reviews?.some((r: any) => r.reviewerId === currentUser?.id)
+
   const isAdmin = currentUser?.role === 'ADMIN'
   const isCreatorOrAssignee = currentUser && (work.creatorId === currentUser.id || work.assigneeId === currentUser.id)
   const isAuthorized = isAdmin || isCreatorOrAssignee
 
-  const handleStatusChange = async (newStatus: string, customPoints?: number, reason?: string) => {
+  const handleStatusChange = async (newStatus: string, reason?: string) => {
     if (!isAuthorized) return
     setIsUpdating(true)
     try {
-      await updateWorkStatus(work.id, newStatus, customPoints ?? pointsInput, reason)
+      await updateWorkStatus(work.id, newStatus, reason)
     } catch (e) {
       console.error(e)
     } finally {
@@ -50,9 +56,21 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
     }
   }
 
+  const handleReviewSubmit = async () => {
+    if (rating < 1 || rating > 5) return
+    setIsUpdating(true)
+    try {
+      await submitWorkReview(work.id, rating, feedback)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
   const submitBlockedState = () => {
     if (!blockReason.trim()) return
-    handleStatusChange('BLOCKED', pointsInput, blockReason)
+    handleStatusChange('BLOCKED', blockReason)
   }
 
   const handlePostUpdate = async () => {
@@ -158,7 +176,7 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
       case 'COMPLETED':
         return (
           <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full select-none">
-            <CheckCircle2 size={10} className="shrink-0" /> Completed (+{work.points} PTS)
+            <CheckCircle2 size={10} className="shrink-0" /> Completed
           </span>
         )
       case 'ARCHIVED':
@@ -424,37 +442,92 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
       {/* Status Controls Panel */}
       {isAuthorized && (
         <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
-          {/* Admin points management */}
-          {isAdmin && (
-            <div className="flex items-center gap-2 select-none">
-              <span className="text-[9px] uppercase font-bold text-muted-foreground">Reward Points:</span>
-              <div className="flex items-center bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const nextVal = Math.max(0, pointsInput - 1)
-                    setPointsInput(nextVal)
-                    await updateWorkStatus(work.id, work.status, nextVal)
-                  }}
-                  className="px-2.5 py-1 text-xs text-muted-foreground hover:text-white hover:bg-white/5 transition-all cursor-pointer font-black"
-                >
-                  -
-                </button>
-                <span className="px-3 text-xs font-bold font-mono text-[#63BDF2] min-w-[28px] text-center bg-white/5 border-x border-white/5">
-                  {pointsInput}
-                </span>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const nextVal = pointsInput + 1
-                    setPointsInput(nextVal)
-                    await updateWorkStatus(work.id, work.status, nextVal)
-                  }}
-                  className="px-2.5 py-1 text-xs text-muted-foreground hover:text-white hover:bg-white/5 transition-all cursor-pointer font-black"
-                >
-                  +
-                </button>
+          {/* Review Section for Completed Works */}
+          {isCompleted && (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Peer Reviews</span>
+                {work.reviews?.length > 0 && (
+                  <div className="flex items-center gap-1 text-amber-400">
+                    <span className="text-xs font-black">
+                      {(work.reviews.reduce((acc: number, r: any) => acc + r.rating, 0) / work.reviews.length).toFixed(1)}
+                    </span>
+                    <span className="text-[10px]">⭐</span>
+                    <span className="text-[9px] text-muted-foreground ml-1">({work.reviews.length})</span>
+                  </div>
+                )}
               </div>
+
+              {!hasRated && (
+                <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-500/70">Rate this work</span>
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setRating(star)}
+                          className={`text-lg transition-all ${rating >= star ? 'text-amber-400 scale-110 drop-shadow-[0_0_5px_rgba(251,191,36,0.5)]' : 'text-zinc-600 hover:text-amber-400/50'}`}
+                        >
+                          ★
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {rating > 0 && (
+                    <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                      <input 
+                        type="text"
+                        placeholder="Optional feedback or point out mistakes..."
+                        value={feedback}
+                        onChange={(e) => setFeedback(e.target.value)}
+                        className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-amber-500/50"
+                      />
+                      <div className="flex justify-end">
+                        <button 
+                          type="button"
+                          disabled={isUpdating}
+                          onClick={handleReviewSubmit}
+                          className="bg-amber-500 hover:bg-amber-400 text-black px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider disabled:opacity-50 transition-colors"
+                        >
+                          Submit Review
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Display existing reviews */}
+              {work.reviews?.length > 0 && (
+                <div className="space-y-2 mt-2">
+                  {work.reviews.map((r: any) => (
+                    <div key={r.id} className="bg-white/5 border border-white/10 rounded-xl p-3 text-xs">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-1.5">
+                          {r.reviewer?.profilePhoto ? (
+                            <img src={r.reviewer.profilePhoto} alt={r.reviewer.name} className="w-4 h-4 rounded-full" />
+                          ) : (
+                            <User size={12} className="text-muted-foreground" />
+                          )}
+                          <span className="font-semibold text-white/90">{r.reviewer?.name}</span>
+                        </div>
+                        <div className="flex text-amber-400 text-[10px]">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <span key={i} className={i < r.rating ? "opacity-100" : "opacity-30"}>★</span>
+                          ))}
+                        </div>
+                      </div>
+                      {r.feedback && (
+                        <p className="text-muted-foreground leading-relaxed italic border-l-2 border-white/10 pl-2 ml-1 mt-2">
+                          "{r.feedback}"
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -574,7 +647,7 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
                     const durationStr = durationEl?.value?.trim()
                     const finalReason = durationStr ? `[Stopped for: ${durationStr}] ${blockReason}` : blockReason
                     if (!finalReason.trim()) return
-                    handleStatusChange('BLOCKED', pointsInput, finalReason)
+                    handleStatusChange('BLOCKED', finalReason)
                   }}
                   disabled={!blockReason.trim()}
                   className="bg-red-500 hover:bg-red-600 text-black px-2.5 py-1 rounded-xl text-[10px] font-black disabled:opacity-50 cursor-pointer"
@@ -611,7 +684,7 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
                   onClick={() => {
                     if (!deleteReason.trim()) return
                     const finalReason = `[Deleted by ${currentUser?.name || 'Creator'}] ${deleteReason}`
-                    handleStatusChange('DELETED', pointsInput, finalReason)
+                    handleStatusChange('DELETED', finalReason)
                     setShowDeleteInput(false)
                   }}
                   disabled={!deleteReason.trim()}
