@@ -340,62 +340,57 @@ export default async function Home() {
         <MetricsSection />
       </Suspense>
 
-      {/* Main Layout Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left: Active Work Preview */}
-        <div className="lg:col-span-8 space-y-8">
-          <div className="bg-secondary/10 border border-border/30 rounded-3xl p-6 backdrop-blur-xl space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border/30">
-              <div className="flex items-center gap-2">
-                <Briefcase className="text-primary" size={20} />
-                <h2 className="text-lg font-bold text-white tracking-tight">Active Workspace</h2>
-                <SectionGuide 
-                  title="Active Workspace"
-                  content="Shows the top 3 currently active tasks. These are work items converted from approved proposals or directly created in the Workspace. Click a card to see its full timeline."
-                />
-              </div>
-              <Link 
-                href="/works"
-                className="flex items-center gap-1.5 text-xs font-bold text-primary hover:underline group shrink-0"
-              >
-                Open Full Workspace <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-              </Link>
-            </div>
-
-            <Suspense fallback={<ActiveProjectsSkeleton />}>
-              <ActiveProjectsSection currentUser={session?.user} />
-            </Suspense>
+      {/* Active Workspace — FULL WIDTH */}
+      <div className="bg-secondary/10 border border-border/30 rounded-3xl p-6 backdrop-blur-xl space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border/30">
+          <div className="flex items-center gap-2">
+            <Briefcase className="text-primary" size={20} />
+            <h2 className="text-lg font-bold text-white tracking-tight">Active Workspace</h2>
+            <SectionGuide 
+              title="Active Workspace"
+              content="Shows the currently active tasks. These are work items converted from approved proposals after full team consensus. Click a card to see its full timeline."
+            />
           </div>
+          <Link 
+            href="/works"
+            className="flex items-center gap-1.5 text-xs font-bold text-primary hover:underline group shrink-0"
+          >
+            Open Full Workspace <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+          </Link>
         </div>
 
-        {/* Right Sidebar */}
-        <div className="lg:col-span-4 space-y-8">
-          {/* Proposals Compact Preview (Read-Only) */}
-          <div className="bg-secondary/20 border border-yellow-400/10 rounded-3xl p-6 backdrop-blur-xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-border/30">
-              <div className="flex items-center gap-2">
-                <Lightbulb className="text-yellow-400" size={18} />
-                <h3 className="text-sm font-bold text-white tracking-tight">Proposals</h3>
-                <SectionGuide 
-                  title="Proposals Overview"
-                  content="Read-only snapshot of current proposals. See how many ideas are open, queued, or declined. Click 'Open Proposals Hub' to vote, add new proposals, or manage the lifecycle."
-                />
-              </div>
-            </div>
-            <Suspense fallback={<ProposalsPreviewSkeleton />}>
-              <ProposalsPreviewSection />
-            </Suspense>
-          </div>
-
-          {/* Leaderboard */}
-          <Suspense fallback={<LeaderboardSkeleton />}>
-            <LeaderboardSection />
-          </Suspense>
-
-          {/* How It Works Guide */}
-          <WorkspaceGuideCard />
-        </div>
+        <Suspense fallback={<ActiveProjectsSkeleton />}>
+          <ActiveProjectsSection currentUser={session?.user} />
+        </Suspense>
       </div>
+
+      {/* Proposals + Leaderboard — SIDE BY SIDE */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+        {/* Proposals Compact Preview (Read-Only) */}
+        <div className="bg-secondary/20 border border-yellow-400/10 rounded-3xl p-6 backdrop-blur-xl space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-border/30">
+            <div className="flex items-center gap-2">
+              <Lightbulb className="text-yellow-400" size={18} />
+              <h3 className="text-sm font-bold text-white tracking-tight">Proposals</h3>
+              <SectionGuide 
+                title="Proposals Overview"
+                content="Read-only snapshot of current proposals. See how many ideas are open, queued, or declined. Click 'Open Proposals Hub' to vote, add new proposals, or manage the full lifecycle."
+              />
+            </div>
+          </div>
+          <Suspense fallback={<ProposalsPreviewSkeleton />}>
+            <ProposalsPreviewSection />
+          </Suspense>
+        </div>
+
+        {/* Leaderboard */}
+        <Suspense fallback={<LeaderboardSkeleton />}>
+          <LeaderboardSection />
+        </Suspense>
+      </div>
+
+      {/* How It Works Guide — Full Width */}
+      <WorkspaceGuideCard />
     </div>
   )
 }

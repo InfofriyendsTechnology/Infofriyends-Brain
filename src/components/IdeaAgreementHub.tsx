@@ -289,12 +289,20 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                       {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <ListOrdered size={12} />}
                     </button>
 
-                    <button onClick={() => handleAction(idea.id, () => updateWorkStatus(idea.id, 'ACTIVE'))} disabled={actionId === idea.id}
-                      className="text-xs bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 text-emerald-400 px-2.5 py-2 rounded-xl font-bold flex items-center gap-1 transition-all cursor-pointer select-none"
-                      title="Start Active Work">
-                      {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <Play size={10} className="fill-emerald-400 text-emerald-400" />}
-                    </button>
-
+                    {/* Convert to Work — ONLY at 100% consensus */}
+                    {approvalRate >= 100 ? (
+                      <button onClick={() => handleAction(idea.id, () => updateWorkStatus(idea.id, 'ACTIVE'))} disabled={actionId === idea.id}
+                        className="text-xs bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-400 px-3 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none animate-pulse hover:animate-none"
+                        title="All members agreed — Convert to Active Work">
+                        {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <Play size={10} className="fill-emerald-400 text-emerald-400" />}
+                        <span>Convert to Work</span>
+                      </button>
+                    ) : (
+                      <div className="text-[9px] text-zinc-600 bg-zinc-800/30 border border-zinc-700/20 px-2.5 py-2 rounded-xl font-bold flex items-center gap-1 select-none cursor-not-allowed" title={`Need ${membersCount - idea.supports.length} more agree to convert`}>
+                        <Play size={10} className="text-zinc-700" />
+                        <span>{approvalRate}% — Need all</span>
+                      </div>
+                    )}
                     <button onClick={() => setDeclineModalId(idea.id)}
                       className="text-xs bg-red-500/5 hover:bg-red-500/10 border border-red-500/15 text-red-400 px-2.5 py-2 rounded-xl font-bold flex items-center gap-1 transition-all cursor-pointer select-none"
                       title="Decline Proposal">
