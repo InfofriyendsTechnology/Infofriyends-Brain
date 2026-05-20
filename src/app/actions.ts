@@ -233,22 +233,72 @@ export async function getIdeasWithSupports() {
   try {
     const data = await prisma.work.findMany({
       where: {
-        status: 'IDEA'
+        status: { in: ['IDEA', 'QUEUED'] }
       },
       include: {
         creator: { select: { id: true, name: true, profilePhoto: true, role: true } },
+        assignee: { select: { id: true, name: true, profilePhoto: true, role: true } },
         supports: {
           include: {
             user: { select: { id: true, name: true, profilePhoto: true, role: true } }
-          }
+          },
+          orderBy: { createdAt: 'desc' }
+        },
+        activityLogs: {
+          include: {
+            user: { select: { id: true, name: true, profilePhoto: true, role: true } }
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 10
         }
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [
+        { priority: 'asc' }, // URGENT first
+        { createdAt: 'desc' }
+      ],
     })
     return JSON.parse(JSON.stringify(data))
   } catch (error) {
     console.error('Failed to get ideas with supports:', error)
     return []
+  }
+}
+
+export async function queueIdea(workId: string) {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Unauthorized' }
+  const user = session.user
+
+  try {
+    const work = await prisma.work.findUnique({ where: { id: workId } })
+    if (!work) return { success: false, error: 'Work not found' }
+
+    const isAuthorized = user.role === 'ADMIN' || work.creatorId === user.id
+    if (!isAuthorized) return { success: false, error: 'Not authorized' }
+
+    // Toggle between IDEA and QUEUED
+    const newStatus = work.status === 'QUEUED' ? 'IDEA' : 'QUEUED'
+    
+    await prisma.work.update({
+      where: { id: workId },
+      data: { status: newStatus }
+    })
+
+    await logActivity(
+      newStatus === 'QUEUED' ? 'QUEUED_IDEA' : 'UNQUEUED_IDEA',
+      user.id,
+      workId,
+      newStatus === 'QUEUED'
+        ? `Moved proposal "${work.name}" to execution queue — ready for work`
+        : `Removed proposal "${work.name}" from queue — back to open ideas`
+    )
+
+    revalidatePath('/')
+    revalidatePath('/works')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to queue idea:', error)
+    return { success: false, error: `Database error: ${error.message || error}` }
   }
 }
 
