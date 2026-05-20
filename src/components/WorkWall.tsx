@@ -16,19 +16,22 @@ function CustomDropdown({
   value, 
   onChange, 
   options,
+  isOpen,
+  setIsOpen,
   chevronColor = 'text-muted-foreground'
 }: { 
   label: string, 
   value: string, 
   onChange: (val: string) => void, 
   options: { value: string, label: string }[],
+  isOpen: boolean,
+  setIsOpen: (open: boolean) => void,
   chevronColor?: string
 }) {
-  const [isOpen, setIsOpen] = useState(false)
   const activeOption = options.find(o => o.value === value) || options[0]
 
   return (
-    <div className="relative select-none z-30">
+    <div className={`relative select-none transition-all duration-150 ${isOpen ? 'z-50' : 'z-30'}`}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -87,6 +90,7 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
   const [members, setMembers] = useState<any[]>([])
   const [isUpdatingRow, setIsUpdatingRow] = useState<string | null>(null)
+  const [openDropdown, setOpenDropdown] = useState<'status' | 'priority' | 'member' | null>(null)
   const { setAddWorkModalOpen } = useStore()
 
   const statusOptions = [
@@ -183,6 +187,7 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
           onClick={() => {
             setActiveScope('all')
             setStatusFilter('ALL')
+            setOpenDropdown(null)
           }}
           className={`relative flex-1 sm:flex-initial px-2 sm:px-4 py-2 text-xs font-black rounded-xl transition-all whitespace-nowrap cursor-pointer uppercase tracking-wider ${
             activeScope === 'all' ? 'text-black z-10' : 'text-muted-foreground hover:text-white'
@@ -205,6 +210,7 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
           onClick={() => {
             setActiveScope('focus')
             setStatusFilter('ALL')
+            setOpenDropdown(null)
           }}
           className={`relative flex-1 sm:flex-initial px-2 sm:px-4 py-2 text-xs font-black rounded-xl transition-all whitespace-nowrap cursor-pointer uppercase tracking-wider ${
             activeScope === 'focus' ? 'text-black z-10' : 'text-muted-foreground hover:text-white'
@@ -247,6 +253,8 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
             value={statusFilter}
             onChange={setStatusFilter}
             options={statusOptions}
+            isOpen={openDropdown === 'status'}
+            setIsOpen={(open) => setOpenDropdown(open ? 'status' : null)}
           />
 
           {/* Priority Filter Custom Dropdown */}
@@ -255,6 +263,8 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
             value={priorityFilter}
             onChange={setPriorityFilter}
             options={priorityOptions}
+            isOpen={openDropdown === 'priority'}
+            setIsOpen={(open) => setOpenDropdown(open ? 'priority' : null)}
           />
 
           {/* Member Filter Custom Dropdown */}
@@ -263,6 +273,8 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
             value={memberFilter}
             onChange={setMemberFilter}
             options={memberOptions}
+            isOpen={openDropdown === 'member'}
+            setIsOpen={(open) => setOpenDropdown(open ? 'member' : null)}
           />
 
           {/* Grid vs Table Layout selection (Hidden on Mobile) */}
@@ -301,6 +313,7 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
               setStatusFilter('BLOCKED')
               setPriorityFilter('ALL')
               setMemberFilter('ALL')
+              setOpenDropdown(null)
             }}
             className="bg-red-500 hover:bg-red-600 text-black px-3 py-1.5 rounded-xl font-bold uppercase text-[10px] tracking-wider cursor-pointer"
           >
