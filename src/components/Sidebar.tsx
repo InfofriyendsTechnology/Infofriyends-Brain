@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LayoutDashboard, Briefcase, Shield, LogOut, Plus, User, HelpCircle, MessageSquare, MoreHorizontal, EyeOff, ChevronUp } from 'lucide-react'
+import { LayoutDashboard, Briefcase, Shield, LogOut, Plus, User, HelpCircle, MessageSquare, MoreHorizontal, EyeOff, ChevronUp, Lightbulb } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { logoutAction } from '@/app/actions/auth'
 import { useState, useEffect } from 'react'
@@ -25,7 +25,8 @@ export default function Sidebar({ session }: { session: any }) {
 
   const navItems = [
     { name: 'Dashboard', href: '/', icon: <LayoutDashboard size={20} /> },
-    { name: 'Work Wall', href: '/works', icon: <Briefcase size={20} /> },
+    { name: 'Workspace', href: '/works', icon: <Briefcase size={20} /> },
+    { name: 'Proposals', href: '/proposals', icon: <Lightbulb size={20} /> },
     { name: 'Team Chat', href: '/chat', icon: <MessageSquare size={20} /> },
     { name: 'Profile Settings', href: '/profile', icon: <User size={20} /> },
     { name: 'How It Works', href: '/docs', icon: <HelpCircle size={20} /> },
@@ -236,7 +237,7 @@ export default function Sidebar({ session }: { session: any }) {
           <span className="text-[7.5px] min-[360px]:text-[8px] font-bold mt-1 tracking-tight truncate w-full text-center">Home</span>
         </Link>
 
-        {/* Button 2: Works */}
+        {/* Button 2: Workspace */}
         <Link 
           href="/works" 
           onClick={() => setShowMoreMenu(false)}
@@ -245,10 +246,22 @@ export default function Sidebar({ session }: { session: any }) {
           }`}
         >
           <Briefcase size={18} />
-          <span className="text-[7.5px] min-[360px]:text-[8px] font-bold mt-1 tracking-tight truncate w-full text-center">Works</span>
+          <span className="text-[7.5px] min-[360px]:text-[8px] font-bold mt-1 tracking-tight truncate w-full text-center">Work</span>
         </Link>
 
-        {/* Button 3: Chat */}
+        {/* Button 3: Proposals */}
+        <Link 
+          href="/proposals" 
+          onClick={() => setShowMoreMenu(false)}
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all w-14 ${
+            pathname === '/proposals' ? 'text-yellow-400' : 'text-muted-foreground hover:text-white'
+          }`}
+        >
+          <Lightbulb size={18} />
+          <span className="text-[7.5px] min-[360px]:text-[8px] font-bold mt-1 tracking-tight truncate w-full text-center">Ideas</span>
+        </Link>
+
+        {/* Button 4: Chat */}
         <Link 
           href="/chat" 
           onClick={() => setShowMoreMenu(false)}

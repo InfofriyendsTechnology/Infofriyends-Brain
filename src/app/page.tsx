@@ -5,9 +5,8 @@ import AddWorkModal from '@/components/AddWorkModal'
 import MemberLeaderboard from '@/components/MemberLeaderboard'
 import DashboardMetrics from '@/components/DashboardMetrics'
 import WorkCard from '@/components/WorkCard'
-import IdeaAgreementHub from '@/components/IdeaAgreementHub'
 import SectionGuide from '@/components/SectionGuide'
-import { Terminal, ArrowRight, FolderGit2 } from 'lucide-react'
+import { Terminal, ArrowRight, Briefcase, Lightbulb, ListOrdered, XCircle, ThumbsUp, Clock } from 'lucide-react'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import LiveClock from '@/components/LiveClock'
@@ -75,7 +74,7 @@ async function ActiveProjectsSection({ currentUser }: { currentUser: any }) {
 
       {activeWorksPreview.length === 0 && (
         <div className="text-center py-12 text-muted-foreground text-sm">
-          No active projects found. Let's create some new works on the Work Wall!
+          No active tasks. Approved proposals will appear here as active work.
         </div>
       )}
     </>
@@ -139,13 +138,6 @@ function LeaderboardSkeleton() {
                 <div className="h-3 w-16 bg-white/5 rounded" />
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="space-y-1">
-                <div className="h-3.5 w-10 bg-white/5 rounded" />
-                <div className="h-2 w-8 bg-white/5 rounded" />
-              </div>
-              <div className="w-6 h-6 rounded-full bg-white/5" />
-            </div>
           </div>
         ))}
       </div>
@@ -153,8 +145,8 @@ function LeaderboardSkeleton() {
   )
 }
 
-// --- 4. IDEA AGREEMENT STREAMING SECTION ---
-async function IdeaAgreementSection({ currentUser }: { currentUser: any }) {
+// --- 4. PROPOSALS COMPACT PREVIEW (Read-Only) ---
+async function ProposalsPreviewSection() {
   let ideas: any[] = []
   let membersCount = 0
   try {
@@ -163,77 +155,143 @@ async function IdeaAgreementSection({ currentUser }: { currentUser: any }) {
     membersCount = members.length
   } catch (e) {}
 
+  const openIdeas = ideas.filter(f => f.status === 'IDEA')
+  const queuedIdeas = ideas.filter(f => f.status === 'QUEUED')
+  const declinedIdeas = ideas.filter(f => f.status === 'DECLINED')
+  const topIdeas = openIdeas.slice(0, 3) // Show top 3 open proposals
+
   return (
-    <IdeaAgreementHub 
-      ideas={ideas} 
-      currentUser={currentUser} 
-      membersCount={membersCount} 
-    />
+    <div className="space-y-5">
+      {/* Stats Row */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-[#0c0d12]/60 border border-yellow-400/10 rounded-xl p-3 text-center space-y-1">
+          <div className="flex items-center justify-center gap-1 text-yellow-400">
+            <Lightbulb size={14} />
+            <span className="text-lg font-black">{openIdeas.length}</span>
+          </div>
+          <p className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider">Open Ideas</p>
+        </div>
+        <div className="bg-[#0c0d12]/60 border border-purple-400/10 rounded-xl p-3 text-center space-y-1">
+          <div className="flex items-center justify-center gap-1 text-purple-400">
+            <ListOrdered size={14} />
+            <span className="text-lg font-black">{queuedIdeas.length}</span>
+          </div>
+          <p className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider">In Queue</p>
+        </div>
+        <div className="bg-[#0c0d12]/60 border border-red-400/10 rounded-xl p-3 text-center space-y-1">
+          <div className="flex items-center justify-center gap-1 text-red-400">
+            <XCircle size={14} />
+            <span className="text-lg font-black">{declinedIdeas.length}</span>
+          </div>
+          <p className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider">Declined</p>
+        </div>
+      </div>
+
+      {/* Top Proposals Preview List */}
+      {topIdeas.length > 0 ? (
+        <div className="space-y-2.5">
+          {topIdeas.map(idea => {
+            const approvalRate = membersCount > 0 ? Math.round((idea.supports.length / membersCount) * 100) : 0
+            return (
+              <div key={idea.id} className="bg-[#0c0d12]/40 border border-white/5 rounded-xl p-3.5 space-y-2 hover:border-white/10 transition-all">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="space-y-1 flex-1 min-w-0">
+                    <h4 className="text-xs font-bold text-white truncate">{idea.name}</h4>
+                    <div className="flex items-center gap-2 text-[9px] text-zinc-500">
+                      <span suppressHydrationWarning>
+                        <Clock size={9} className="inline mr-0.5" />
+                        {new Date(idea.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                      </span>
+                      <span>by {idea.creator?.name}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 text-[10px] text-[#63BDF2] font-bold shrink-0">
+                    <ThumbsUp size={10} className="fill-[#63BDF2]" />
+                    {idea.supports.length}/{membersCount}
+                  </div>
+                </div>
+                {/* Mini Progress Bar */}
+                <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
+                  <div className="bg-gradient-to-r from-[#63BDF2] to-blue-500 h-full rounded-full transition-all duration-300" style={{ width: `${Math.min(100, approvalRate)}%` }} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="text-center py-6 text-muted-foreground text-[11px] italic">
+          No open proposals right now.
+        </div>
+      )}
+
+      {/* Go to Proposals Link */}
+      <Link 
+        href="/proposals"
+        className="flex items-center justify-center gap-1.5 text-xs font-bold text-yellow-400 hover:text-yellow-300 bg-yellow-400/5 border border-yellow-400/10 hover:border-yellow-400/20 px-4 py-2.5 rounded-xl transition-all group"
+      >
+        Open Proposals Hub <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+      </Link>
+    </div>
   )
 }
 
-function IdeaAgreementSkeleton() {
+function ProposalsPreviewSkeleton() {
   return (
-    <div className="bg-[#0d0e12] border border-white/5 rounded-3xl p-6 md:p-8 space-y-6 animate-pulse select-none">
-      <div className="flex justify-between items-center pb-4 border-b border-white/5">
-        <div className="h-6 w-48 bg-white/5 rounded-lg" />
-        <div className="h-8 w-24 bg-white/5 rounded-xl" />
+    <div className="space-y-4 select-none animate-pulse">
+      <div className="grid grid-cols-3 gap-3">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="bg-[#0c0d12]/60 border border-white/5 rounded-xl p-3 space-y-2">
+            <div className="h-5 w-6 mx-auto bg-white/5 rounded" />
+            <div className="h-2.5 w-12 mx-auto bg-white/5 rounded" />
+          </div>
+        ))}
       </div>
-      <div className="space-y-4">
-        {[1, 2].map(i => (
-          <div key={i} className="h-28 bg-white/5 rounded-2xl" />
+      <div className="space-y-2.5">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="h-16 bg-white/5 rounded-xl" />
         ))}
       </div>
     </div>
   )
 }
 
+// --- WORKSPACE GUIDE CARD ---
 function WorkspaceGuideCard() {
   return (
     <div className="bg-secondary/20 border border-[#63BDF2]/10 rounded-3xl p-6 space-y-5 backdrop-blur-xl relative overflow-hidden group">
-      {/* Decorative glow */}
       <div className="absolute -top-10 -right-10 w-24 h-24 bg-[#63BDF2]/10 rounded-full blur-2xl group-hover:bg-[#63BDF2]/15 transition-all duration-300" />
       
       <div className="flex items-center gap-2 pb-3 border-b border-border/30">
         <span className="text-lg">💡</span>
-        <h3 className="font-bold text-sm uppercase tracking-wider text-white">Workspace Guide</h3>
+        <h3 className="font-bold text-sm uppercase tracking-wider text-white">How It Works</h3>
       </div>
       
       <div className="space-y-4">
         <div className="space-y-1">
-          <h4 className="text-xs font-bold text-primary flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-            Global Workspace Wall
+          <h4 className="text-xs font-bold text-yellow-400 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+            Proposals & Decisions
           </h4>
           <p className="text-[11px] text-zinc-400 leading-relaxed pl-3 font-medium">
-            Central repository tracking all feature requests. Members move items across Idea, Active, Blocked, and Completed columns.
+            Team members propose ideas. Everyone votes to agree. Once consensus is reached, proposals convert to active workspace tasks.
+          </p>
+        </div>
+        <div className="space-y-1">
+          <h4 className="text-xs font-bold text-primary flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+            Workspace
+          </h4>
+          <p className="text-[11px] text-zinc-400 leading-relaxed pl-3 font-medium">
+            Daily operations hub. Active tasks, ongoing projects, and completed work. Items arrive here after proposal approval.
           </p>
         </div>
         <div className="space-y-1">
           <h4 className="text-xs font-bold text-orange-400 flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
-            My Focus Area
-          </h4>
-          <p className="text-[11px] text-zinc-400 leading-relaxed pl-3 font-medium">
-            Your personalized sandbox. Automatically filters and highlights tasks explicitly assigned to your focus.
-          </p>
-        </div>
-        <div className="space-y-1">
-          <h4 className="text-xs font-bold text-[#63BDF2] flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#63BDF2]" />
-            Proposals & Ideas Board
-          </h4>
-          <p className="text-[11px] text-zinc-400 leading-relaxed pl-3 font-medium">
-            Company-wide idea sharing. Vote 'Agree' to show consensus on company proposals and decisions before starting action.
-          </p>
-        </div>
-        <div className="space-y-1">
-          <h4 className="text-xs font-bold text-yellow-400 flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
             Founder Board
           </h4>
           <p className="text-[11px] text-zinc-400 leading-relaxed pl-3 font-medium">
-            Weekly team momentum tracker. Members earn developer points for task completion based on complexity.
+            Contribution leaderboard. Members earn points when tasks they handle are completed.
           </p>
         </div>
       </div>
@@ -251,7 +309,6 @@ export default async function Home() {
 
       {/* Header Banner (Instant Render) */}
       <div className="relative overflow-hidden rounded-3xl border border-border/40 bg-gradient-to-br from-secondary/15 via-background to-secondary/10 p-6 md:p-8 backdrop-blur-xl">
-        {/* Subtle Ambient Glows */}
         <div className="absolute top-0 right-0 w-80 h-80 bg-[#63BDF2]/10 rounded-full blur-[100px] pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-60 h-60 bg-[#3188DA]/5 rounded-full blur-[80px] pointer-events-none" />
 
@@ -268,7 +325,6 @@ export default async function Home() {
             </p>
           </div>
           
-          {/* Elegant Flat System Monitoring */}
           <div className="flex flex-col md:items-end gap-2.5 select-none shrink-0">
             <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 px-3 py-1.5 rounded-full">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -279,55 +335,64 @@ export default async function Home() {
         </div>
       </div>
 
-      {/* Metrics Bar - Progressive Hydration */}
+      {/* Metrics Bar */}
       <Suspense fallback={<MetricsSkeleton />}>
         <MetricsSection />
       </Suspense>
 
-      {/* Main SaaS Layout Grid */}
+      {/* Main Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left main section: Active Works Summary & Previews */}
-        {/* Left main section: Active Works & Ideas Hub */}
+        {/* Left: Active Work Preview */}
         <div className="lg:col-span-8 space-y-8">
-          {/* Active Projects Overview */}
           <div className="bg-secondary/10 border border-border/30 rounded-3xl p-6 backdrop-blur-xl space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border/30">
               <div className="flex items-center gap-2">
-                <FolderGit2 className="text-primary" size={20} />
-                <h2 className="text-lg font-bold text-white tracking-tight">Active Projects Overview</h2>
+                <Briefcase className="text-primary" size={20} />
+                <h2 className="text-lg font-bold text-white tracking-tight">Active Workspace</h2>
                 <SectionGuide 
-                  title="Active Projects"
-                  content="This grid showcases works that are currently in the ACTIVE development stage. Tap on a project to open its timeline checklist or record new activity updates."
+                  title="Active Workspace"
+                  content="Shows the top 3 currently active tasks. These are work items converted from approved proposals or directly created in the Workspace. Click a card to see its full timeline."
                 />
               </div>
               <Link 
                 href="/works"
                 className="flex items-center gap-1.5 text-xs font-bold text-primary hover:underline group shrink-0"
               >
-                Go to Work Wall <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                Open Full Workspace <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
               </Link>
             </div>
 
-            {/* Top 3 Active Works Preview - Progressive Hydration */}
             <Suspense fallback={<ActiveProjectsSkeleton />}>
               <ActiveProjectsSection currentUser={session?.user} />
             </Suspense>
           </div>
-
-          {/* Ideas Alignment & Consensus Hub */}
-          <Suspense fallback={<IdeaAgreementSkeleton />}>
-            <IdeaAgreementSection currentUser={session?.user} />
-          </Suspense>
         </div>
 
-        {/* Right sidebar section: Leaderboard & Workspace Guide */}
+        {/* Right Sidebar */}
         <div className="lg:col-span-4 space-y-8">
-          {/* Leaderboard - Progressive Hydration */}
+          {/* Proposals Compact Preview (Read-Only) */}
+          <div className="bg-secondary/20 border border-yellow-400/10 rounded-3xl p-6 backdrop-blur-xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-border/30">
+              <div className="flex items-center gap-2">
+                <Lightbulb className="text-yellow-400" size={18} />
+                <h3 className="text-sm font-bold text-white tracking-tight">Proposals</h3>
+                <SectionGuide 
+                  title="Proposals Overview"
+                  content="Read-only snapshot of current proposals. See how many ideas are open, queued, or declined. Click 'Open Proposals Hub' to vote, add new proposals, or manage the lifecycle."
+                />
+              </div>
+            </div>
+            <Suspense fallback={<ProposalsPreviewSkeleton />}>
+              <ProposalsPreviewSection />
+            </Suspense>
+          </div>
+
+          {/* Leaderboard */}
           <Suspense fallback={<LeaderboardSkeleton />}>
             <LeaderboardSection />
           </Suspense>
 
-          {/* Workspace Guide Card */}
+          {/* How It Works Guide */}
           <WorkspaceGuideCard />
         </div>
       </div>

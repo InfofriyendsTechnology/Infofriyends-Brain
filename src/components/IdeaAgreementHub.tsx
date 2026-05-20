@@ -3,11 +3,11 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Lightbulb, Check, Plus, Clock, Calendar, User as UserIcon,
-  ThumbsUp, CheckCircle2, Loader2, Play, ListOrdered,
-  ChevronDown, ChevronUp, History, ArrowRightCircle
+  Lightbulb, Check, Plus, Clock, Calendar, 
+  ThumbsUp, Loader2, Play, ListOrdered, XCircle, Pause, RotateCcw, Trash2,
+  ChevronDown, ChevronUp, History, ArrowRightCircle, AlertTriangle, Archive
 } from 'lucide-react'
-import { createWork, updateWorkStatus, toggleIdeaSupport, queueIdea } from '@/app/actions'
+import { createWork, updateWorkStatus, toggleIdeaSupport, queueIdea, declineIdea, shelveIdea, reviveIdea, deleteIdea } from '@/app/actions'
 import SectionGuide from './SectionGuide'
 
 interface Idea {
@@ -17,6 +17,7 @@ interface Idea {
   priority: string
   points: number
   status: string
+  blockedReason: string | null
   createdAt: string
   updatedAt: string
   creator: {
@@ -77,7 +78,6 @@ function formatRelativeTime(dateStr: string) {
   const mins = Math.floor(diff / 60000)
   const hours = Math.floor(diff / 3600000)
   const days = Math.floor(diff / 86400000)
-  
   if (mins < 1) return 'Just now'
   if (mins < 60) return `${mins}m ago`
   if (hours < 24) return `${hours}h ago`
@@ -86,16 +86,29 @@ function formatRelativeTime(dateStr: string) {
 }
 
 export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: IdeaAgreementHubProps) {
-  const [activeTab, setActiveTab] = useState<'open' | 'queued'>('open')
+  const [activeTab, setActiveTab] = useState<'open' | 'queued' | 'declined' | 'shelved'>('open')
   const [showAddForm, setShowAddForm] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [votingId, setVotingId] = useState<string | null>(null)
-  const [resolvingId, setResolvingId] = useState<string | null>(null)
-  const [queuingId, setQueuingId] = useState<string | null>(null)
+  const [actionId, setActionId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  
+  // Decline modal state
+  const [declineModalId, setDeclineModalId] = useState<string | null>(null)
+  const [declineReason, setDeclineReason] = useState('')
+  const [isDeclining, setIsDeclining] = useState(false)
+
+  // Delete confirmation
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   const openIdeas = ideas.filter(f => f.status === 'IDEA')
   const queuedIdeas = ideas.filter(f => f.status === 'QUEUED')
+  const declinedIdeas = ideas.filter(f => f.status === 'DECLINED')
+  const shelvedIdeas = ideas.filter(f => f.status === 'SHELVED')
+
+  const isAdmin = currentUser?.role === 'ADMIN'
+  const isCreator = (idea: Idea) => currentUser?.id === idea.creator?.id
+  const canManage = (idea: Idea) => isAdmin || isCreator(idea)
 
   async function handleAddIdea(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -107,58 +120,66 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
       if (res.success) {
         setShowAddForm(false)
         ;(e.target as HTMLFormElement).reset()
-      } else {
-        alert(res.error || 'Failed to submit proposal')
-      }
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setIsSubmitting(false)
-    }
+      } else alert(res.error || 'Failed to submit proposal')
+    } catch (err) { console.error(err) }
+    finally { setIsSubmitting(false) }
   }
 
   async function handleVote(id: string) {
     if (!currentUser) return alert('Please login to vote')
     setVotingId(id)
-    try {
-      await toggleIdeaSupport(id)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setVotingId(null)
-    }
+    try { await toggleIdeaSupport(id) } catch (err) { console.error(err) }
+    finally { setVotingId(null) }
   }
 
-  async function handleStartWork(id: string) {
-    setResolvingId(id)
+  async function handleAction(id: string, action: () => Promise<any>) {
+    setActionId(id)
     try {
-      const res = await updateWorkStatus(id, 'ACTIVE')
-      if (!res.success) alert(res.error || 'Failed to start work')
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setResolvingId(null)
-    }
+      const res = await action()
+      if (res && !res.success) alert(res.error || 'Action failed')
+    } catch (err) { console.error(err) }
+    finally { setActionId(null) }
   }
 
-  async function handleQueue(id: string) {
-    setQueuingId(id)
+  async function handleDeclineSubmit() {
+    if (!declineModalId || !declineReason.trim()) return
+    setIsDeclining(true)
     try {
-      const res = await queueIdea(id)
-      if (!res.success) alert(res.error || 'Failed to update queue')
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setQueuingId(null)
-    }
+      const res = await declineIdea(declineModalId, declineReason)
+      if (res.success) {
+        setDeclineModalId(null)
+        setDeclineReason('')
+      } else alert(res.error || 'Failed to decline')
+    } catch (err) { console.error(err) }
+    finally { setIsDeclining(false) }
   }
 
-  const getPriorityBadge = (priority: string) => {
-    switch (priority) {
+  async function handleDelete(id: string) {
+    setActionId(id)
+    try {
+      const res = await deleteIdea(id)
+      if (res.success) {
+        setDeleteConfirmId(null)
+      } else alert(res.error || 'Failed to delete')
+    } catch (err) { console.error(err) }
+    finally { setActionId(null) }
+  }
+
+  const getPriorityBadge = (p: string) => {
+    switch (p) {
       case 'URGENT': return 'text-red-400 bg-red-500/10 border-red-500/20'
       case 'HIGH': return 'text-orange-400 bg-orange-500/10 border-orange-500/20'
       case 'MEDIUM': return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20'
       default: return 'text-blue-400 bg-blue-500/10 border-blue-500/20'
+    }
+  }
+
+  const getStatusStyle = (s: string) => {
+    switch (s) {
+      case 'QUEUED': return 'bg-purple-500/5 border-purple-500/15 hover:border-purple-500/25'
+      case 'DECLINED': return 'bg-red-500/5 border-red-500/10 hover:border-red-500/20 opacity-80'
+      case 'SHELVED': return 'bg-zinc-500/5 border-zinc-500/10 hover:border-zinc-500/20 opacity-75'
+      default: return 'bg-[#09090b]/40 border-white/5 hover:border-white/10'
     }
   }
 
@@ -167,6 +188,9 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     const approvalRate = membersCount > 0 ? Math.round((idea.supports.length / membersCount) * 100) : 0
     const isExpanded = expandedId === idea.id
     const isQueued = idea.status === 'QUEUED'
+    const isDeclined = idea.status === 'DECLINED'
+    const isShelved = idea.status === 'SHELVED'
+    const isArchived = isDeclined || isShelved
 
     return (
       <motion.div 
@@ -174,17 +198,13 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
         layout
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`border p-5 rounded-2xl space-y-4 transition-all ${
-          isQueued 
-            ? 'bg-purple-500/5 border-purple-500/15 hover:border-purple-500/25' 
-            : 'bg-[#09090b]/40 border-white/5 hover:border-white/10'
-        }`}
+        className={`border p-5 rounded-2xl space-y-4 transition-all ${getStatusStyle(idea.status)}`}
       >
-        {/* Header Row: Title + Priority + Status Badge */}
+        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div className="space-y-2 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h4 className="text-sm font-bold text-white tracking-tight">{idea.name}</h4>
+              <h4 className={`text-sm font-bold tracking-tight ${isArchived ? 'text-zinc-400 line-through' : 'text-white'}`}>{idea.name}</h4>
               <span className={`text-[9px] px-1.5 py-0.5 rounded-md border font-black uppercase tracking-wider ${getPriorityBadge(idea.priority)}`}>
                 {idea.priority}
               </span>
@@ -193,10 +213,31 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                   <ListOrdered size={10} /> In Queue
                 </span>
               )}
+              {isDeclined && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-red-500/10 border border-red-500/25 text-red-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                  <XCircle size={10} /> Declined
+                </span>
+              )}
+              {isShelved && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-zinc-500/10 border border-zinc-500/25 text-zinc-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                  <Pause size={10} /> Shelved
+                </span>
+              )}
             </div>
-            <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">{idea.description}</p>
+            <p className={`text-xs leading-relaxed whitespace-pre-wrap ${isArchived ? 'text-zinc-600' : 'text-muted-foreground'}`}>{idea.description}</p>
             
-            {/* Deep Entry Details — Who Created + When */}
+            {/* Decline Reason */}
+            {isDeclined && idea.blockedReason && (
+              <div className="flex items-start gap-2 bg-red-500/5 border border-red-500/10 rounded-xl p-3 mt-2">
+                <AlertTriangle size={14} className="text-red-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-[10px] font-bold text-red-400 uppercase">Decline Reason</span>
+                  <p className="text-[11px] text-red-300/70 leading-relaxed mt-0.5">{idea.blockedReason}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Deep Entry Details */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-2">
               <div className="flex items-center gap-1.5 text-[10px] text-zinc-500">
                 <div className="shrink-0">
@@ -208,7 +249,7 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                     </div>
                   )}
                 </div>
-                <span>Proposed by <strong className="text-zinc-300 font-bold">{idea.creator?.name || 'Unknown'}</strong></span>
+                <span>By <strong className="text-zinc-300 font-bold">{idea.creator?.name || 'Unknown'}</strong></span>
               </div>
               <div className="flex items-center gap-1 text-[10px] text-zinc-500" suppressHydrationWarning>
                 <Calendar size={10} className="text-zinc-600" />
@@ -223,140 +264,146 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2 shrink-0 self-end sm:self-start">
-            {/* Agree Vote */}
-            <button
-              onClick={() => handleVote(idea.id)}
-              disabled={votingId === idea.id}
-              className={`text-xs px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none ${
-                userVoted 
-                  ? 'bg-[#63BDF2]/20 border border-[#63BDF2]/40 text-[#63BDF2] hover:bg-[#63BDF2]/30' 
-                  : 'bg-white/5 border border-white/10 text-white hover:bg-white/10'
-              }`}
-            >
-              {votingId === idea.id ? (
-                <Loader2 size={12} className="animate-spin" />
-              ) : (
-                <ThumbsUp size={12} className={userVoted ? 'fill-[#63BDF2]' : ''} />
-              )}
-              <span>Agree</span>
-            </button>
+            {/* For OPEN/QUEUED ideas */}
+            {!isArchived && (
+              <>
+                <button
+                  onClick={() => handleVote(idea.id)}
+                  disabled={votingId === idea.id}
+                  className={`text-xs px-3 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none ${
+                    userVoted 
+                      ? 'bg-[#63BDF2]/20 border border-[#63BDF2]/40 text-[#63BDF2] hover:bg-[#63BDF2]/30' 
+                      : 'bg-white/5 border border-white/10 text-white hover:bg-white/10'
+                  }`}
+                >
+                  {votingId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <ThumbsUp size={12} className={userVoted ? 'fill-[#63BDF2]' : ''} />}
+                  <span>Agree</span>
+                </button>
 
-            {/* Queue Toggle (Admin/Creator only) */}
-            {(currentUser?.role === 'ADMIN' || currentUser?.id === idea.creator?.id) && (
-              <button
-                onClick={() => handleQueue(idea.id)}
-                disabled={queuingId === idea.id}
-                className={`text-xs px-3 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none ${
-                  isQueued
-                    ? 'bg-purple-500/15 border border-purple-500/30 text-purple-400 hover:bg-purple-500/25'
-                    : 'bg-white/5 border border-white/10 text-zinc-400 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                {queuingId === idea.id ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : (
-                  <ListOrdered size={12} />
+                {canManage(idea) && (
+                  <>
+                    <button onClick={() => handleAction(idea.id, () => queueIdea(idea.id))} disabled={actionId === idea.id}
+                      className={`text-xs px-2.5 py-2 rounded-xl font-bold flex items-center gap-1 transition-all cursor-pointer select-none ${
+                        isQueued ? 'bg-purple-500/15 border border-purple-500/30 text-purple-400' : 'bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10'
+                      }`} title={isQueued ? 'Remove from Queue' : 'Add to Queue'}>
+                      {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <ListOrdered size={12} />}
+                    </button>
+
+                    <button onClick={() => handleAction(idea.id, () => updateWorkStatus(idea.id, 'ACTIVE'))} disabled={actionId === idea.id}
+                      className="text-xs bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 text-emerald-400 px-2.5 py-2 rounded-xl font-bold flex items-center gap-1 transition-all cursor-pointer select-none"
+                      title="Start Active Work">
+                      {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <Play size={10} className="fill-emerald-400 text-emerald-400" />}
+                    </button>
+
+                    <button onClick={() => setDeclineModalId(idea.id)}
+                      className="text-xs bg-red-500/5 hover:bg-red-500/10 border border-red-500/15 text-red-400 px-2.5 py-2 rounded-xl font-bold flex items-center gap-1 transition-all cursor-pointer select-none"
+                      title="Decline Proposal">
+                      <XCircle size={12} />
+                    </button>
+
+                    <button onClick={() => handleAction(idea.id, () => shelveIdea(idea.id))}
+                      className="text-xs bg-zinc-500/5 hover:bg-zinc-500/10 border border-zinc-500/15 text-zinc-400 px-2.5 py-2 rounded-xl font-bold flex items-center gap-1 transition-all cursor-pointer select-none"
+                      title="Shelve for Later">
+                      <Archive size={12} />
+                    </button>
+                  </>
                 )}
-                <span>{isQueued ? 'Remove Queue' : 'Add to Queue'}</span>
-              </button>
+              </>
             )}
 
-            {/* Start Work (Admin/Creator only) */}
-            {(currentUser?.role === 'ADMIN' || currentUser?.id === idea.creator?.id) && (
-              <button
-                onClick={() => handleStartWork(idea.id)}
-                disabled={resolvingId === idea.id}
-                className="text-xs bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 text-emerald-400 px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none"
-              >
-                {resolvingId === idea.id ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : (
-                  <Play size={10} className="fill-emerald-400 text-emerald-400" />
-                )}
-                <span>Start Work</span>
-              </button>
-            )}
-          </div>
-        </div>
+            {/* For DECLINED/SHELVED — Revive & Delete */}
+            {isArchived && canManage(idea) && (
+              <>
+                <button onClick={() => handleAction(idea.id, () => reviveIdea(idea.id))} disabled={actionId === idea.id}
+                  className="text-xs bg-[#63BDF2]/10 hover:bg-[#63BDF2]/20 border border-[#63BDF2]/25 text-[#63BDF2] px-3 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none">
+                  {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                  <span>Revive</span>
+                </button>
 
-        {/* Support Progress Bar */}
-        <div className="pt-3 space-y-1.5 border-t border-white/5">
-          <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-white/95">Team Support:</span>
-              <span>{idea.supports.length} of {membersCount} agreed ({approvalRate}%)</span>
-            </div>
-            {approvalRate === 100 && (
-              <span className="text-emerald-400 font-bold flex items-center gap-1">
-                <Check size={12} /> Complete Consensus
-              </span>
-            )}
-          </div>
-          
-          <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
-            <div 
-              className="bg-gradient-to-r from-[#63BDF2] to-blue-500 h-full rounded-full transition-all duration-300"
-              style={{ width: `${Math.min(100, approvalRate)}%` }}
-            />
-          </div>
-
-          {/* Supporters with Timestamps */}
-          {idea.supports.length > 0 && (
-            <div className="pt-2 space-y-1.5">
-              <span className="text-[9px] uppercase font-bold text-muted-foreground">Agreement Timeline:</span>
-              <div className="flex flex-wrap gap-2">
-                {idea.supports.map(v => (
-                  <div key={v.userId} className="flex items-center gap-1.5 bg-white/5 border border-white/5 rounded-lg px-2 py-1">
-                    {v.user.profilePhoto ? (
-                      <img src={v.user.profilePhoto} alt={v.user.name} className="w-4 h-4 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-4 h-4 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-[7px] uppercase">
-                        {v.user.name.charAt(0)}
-                      </div>
-                    )}
-                    <span className="text-[10px] font-bold text-zinc-300">{v.user.name}</span>
-                    <span className="text-[9px] text-zinc-600" suppressHydrationWarning>• {formatRelativeTime(v.createdAt)}</span>
+                {deleteConfirmId === idea.id ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-red-400 font-bold">Sure?</span>
+                    <button onClick={() => handleDelete(idea.id)} disabled={actionId === idea.id}
+                      className="text-[10px] bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 px-2 py-1 rounded-lg font-bold cursor-pointer select-none">
+                      {actionId === idea.id ? <Loader2 size={10} className="animate-spin" /> : 'Yes, Delete'}
+                    </button>
+                    <button onClick={() => setDeleteConfirmId(null)}
+                      className="text-[10px] bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-400 px-2 py-1 rounded-lg font-bold cursor-pointer select-none">
+                      Cancel
+                    </button>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                ) : (
+                  <button onClick={() => setDeleteConfirmId(idea.id)}
+                    className="text-xs bg-red-500/5 hover:bg-red-500/10 border border-red-500/15 text-red-400/60 px-2.5 py-2 rounded-xl font-bold flex items-center gap-1 transition-all cursor-pointer select-none"
+                    title="Delete Permanently">
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Expandable Activity Log Timeline */}
+        {/* Support Progress Bar — only for non-archived */}
+        {!isArchived && (
+          <div className="pt-3 space-y-1.5 border-t border-white/5">
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-white/95">Team Support:</span>
+                <span>{idea.supports.length} of {membersCount} agreed ({approvalRate}%)</span>
+              </div>
+              {approvalRate === 100 && (
+                <span className="text-emerald-400 font-bold flex items-center gap-1">
+                  <Check size={12} /> Full Consensus
+                </span>
+              )}
+            </div>
+            <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
+              <div className="bg-gradient-to-r from-[#63BDF2] to-blue-500 h-full rounded-full transition-all duration-300" style={{ width: `${Math.min(100, approvalRate)}%` }} />
+            </div>
+
+            {idea.supports.length > 0 && (
+              <div className="pt-2 space-y-1.5">
+                <span className="text-[9px] uppercase font-bold text-muted-foreground">Agreement Timeline:</span>
+                <div className="flex flex-wrap gap-2">
+                  {idea.supports.map(v => (
+                    <div key={v.userId} className="flex items-center gap-1.5 bg-white/5 border border-white/5 rounded-lg px-2 py-1">
+                      {v.user.profilePhoto ? (
+                        <img src={v.user.profilePhoto} alt={v.user.name} className="w-4 h-4 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-4 h-4 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-[7px] uppercase">{v.user.name.charAt(0)}</div>
+                      )}
+                      <span className="text-[10px] font-bold text-zinc-300">{v.user.name}</span>
+                      <span className="text-[9px] text-zinc-600" suppressHydrationWarning>• {formatRelativeTime(v.createdAt)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Activity Log */}
         {idea.activityLogs && idea.activityLogs.length > 0 && (
           <div className="border-t border-white/5 pt-3">
-            <button
-              onClick={() => setExpandedId(isExpanded ? null : idea.id)}
-              className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-zinc-500 hover:text-zinc-300 cursor-pointer transition-colors select-none"
-            >
-              <History size={12} />
-              Activity Log ({idea.activityLogs.length})
+            <button onClick={() => setExpandedId(isExpanded ? null : idea.id)}
+              className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-zinc-500 hover:text-zinc-300 cursor-pointer transition-colors select-none">
+              <History size={12} /> Activity Log ({idea.activityLogs.length})
               {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
             </button>
-
             <AnimatePresence>
               {isExpanded && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden"
-                >
+                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                   <div className="mt-3 space-y-0 relative pl-4 before:absolute before:left-[7px] before:top-1 before:bottom-1 before:w-px before:bg-white/10">
-                    {idea.activityLogs.map((log, i) => (
+                    {idea.activityLogs.map(log => (
                       <div key={log.id} className="relative flex items-start gap-3 pb-3">
-                        {/* Timeline dot */}
                         <div className="absolute left-[-13px] top-1.5 w-2 h-2 rounded-full bg-zinc-700 border border-zinc-600 shrink-0 z-10" />
-                        
                         <div className="flex-1 space-y-0.5">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {log.user?.profilePhoto ? (
                               <img src={log.user.profilePhoto} alt={log.user.name} className="w-3.5 h-3.5 rounded-full object-cover" />
                             ) : (
-                              <div className="w-3.5 h-3.5 rounded-full bg-zinc-700 text-zinc-400 flex items-center justify-center text-[6px] font-bold uppercase">
-                                {log.user?.name?.charAt(0) || '?'}
-                              </div>
+                              <div className="w-3.5 h-3.5 rounded-full bg-zinc-700 text-zinc-400 flex items-center justify-center text-[6px] font-bold uppercase">{log.user?.name?.charAt(0) || '?'}</div>
                             )}
                             <span className="text-[10px] font-bold text-zinc-400">{log.user?.name || 'System'}</span>
                             <span className="text-[9px] text-zinc-600" suppressHydrationWarning>• {formatDateTime(log.createdAt)}</span>
@@ -375,6 +422,30 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     )
   }
 
+  // Tab config with counts
+  const tabs = [
+    { key: 'open' as const, label: 'Open Ideas', icon: <Lightbulb size={12} />, count: openIdeas.length, color: '' },
+    { key: 'queued' as const, label: 'Queue', icon: <ListOrdered size={12} />, count: queuedIdeas.length, color: '' },
+    { key: 'declined' as const, label: 'Declined', icon: <XCircle size={12} />, count: declinedIdeas.length, color: '' },
+    { key: 'shelved' as const, label: 'Shelved', icon: <Archive size={12} />, count: shelvedIdeas.length, color: '' },
+  ]
+
+  const currentList = activeTab === 'open' ? openIdeas : activeTab === 'queued' ? queuedIdeas : activeTab === 'declined' ? declinedIdeas : shelvedIdeas
+  
+  const emptyMessages: Record<string, string> = {
+    open: 'No open proposals right now. Click "New Proposal" to share your idea!',
+    queued: 'No ideas in execution queue. Move ideas here when the team agrees.',
+    declined: 'No declined proposals. Ideas that don\'t pass team review appear here with reasons.',
+    shelved: 'No shelved proposals. Ideas saved for future reconsideration appear here.',
+  }
+
+  const bannerMessages: Record<string, { icon: React.ReactNode; color: string; text: string } | null> = {
+    open: null,
+    queued: { icon: <ArrowRightCircle size={14} className="shrink-0 mt-0.5 text-purple-400" />, color: 'bg-purple-500/5 border-purple-500/10 text-purple-300/80', text: 'Execution Queue — Ideas approved by the team, waiting to start as Active Work. Admin or creator can click the play button to begin.' },
+    declined: { icon: <AlertTriangle size={14} className="shrink-0 mt-0.5 text-red-400" />, color: 'bg-red-500/5 border-red-500/10 text-red-300/70', text: 'Declined Archive — These proposals were reviewed but not approved. Each has a documented reason. They can be revived if the situation changes, or permanently deleted.' },
+    shelved: { icon: <Pause size={14} className="shrink-0 mt-0.5 text-zinc-400" />, color: 'bg-zinc-500/5 border-zinc-500/10 text-zinc-300/70', text: 'Shelved Ideas — Not rejected, just paused. These might be reconsidered in the future when timing or resources are better. Revive anytime.' },
+  }
+
   return (
     <div className="bg-secondary/20 border border-border rounded-3xl p-6 md:p-8 space-y-6">
       {/* Title Header */}
@@ -383,47 +454,31 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
           <Lightbulb className="text-yellow-400" size={20} />
           <h2 className="text-lg font-bold text-white tracking-tight">Proposals & Ideas Alignment</h2>
           <SectionGuide 
-            title="Proposals & Ideas Board" 
-            content="Got an idea for the company or a new workspace project? Post it here as a Proposal! All team members can vote 'Agree' to show support. Use 'Add to Queue' to mark ideas ready for execution. Once consensus is reached, admins move proposals to Active Projects. Every action is timestamped and tracked."
+            title="Full Idea Lifecycle" 
+            content="IDEA → Team votes Agree → QUEUED (ready for work) → ACTIVE (started). If team doesn't agree, ideas can be DECLINED (with reason) or SHELVED (maybe later). Declined/Shelved ideas can be REVIVED or permanently DELETED. Every action is timestamped with full audit trail."
           />
         </div>
-        <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="text-xs bg-white text-black hover:bg-white/90 px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none"
-        >
+        <button onClick={() => setShowAddForm(!showAddForm)}
+          className="text-xs bg-white text-black hover:bg-white/90 px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none">
           <Plus size={14} /> New Proposal
         </button>
       </div>
 
-      {/* Add Idea Proposal Form */}
+      {/* Add Idea Form */}
       <AnimatePresence>
         {showAddForm && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
-          >
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
             <form onSubmit={handleAddIdea} className="bg-[#09090b]/30 border border-white/5 p-4 rounded-2xl space-y-3">
               <h3 className="text-xs font-bold text-white uppercase">Submit New Proposal</h3>
-              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase text-muted-foreground font-bold">Proposal Title</label>
-                  <input
-                    type="text"
-                    name="name"
-                    required
-                    placeholder="e.g., Weekly Team Meetup or Client Dashboard Redesign"
-                    className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary/50"
-                  />
+                  <input type="text" name="name" required placeholder="e.g., Weekly Team Meetup or Client Dashboard Redesign"
+                    className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary/50" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase text-muted-foreground font-bold">Priority</label>
-                  <select
-                    name="priority"
-                    className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary/50"
-                  >
+                  <select name="priority" className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary/50">
                     <option value="LOW">LOW</option>
                     <option value="MEDIUM">MEDIUM</option>
                     <option value="HIGH">HIGH</option>
@@ -431,31 +486,14 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                   </select>
                 </div>
               </div>
-
               <div className="space-y-1">
                 <label className="text-[10px] uppercase text-muted-foreground font-bold">Details / Explanation</label>
-                <textarea
-                  name="description"
-                  required
-                  rows={3}
-                  placeholder="Explain the idea, benefits, or workflow in detail..."
-                  className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 resize-none"
-                />
+                <textarea name="description" required rows={3} placeholder="Explain the idea, benefits, or workflow in detail..."
+                  className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 resize-none" />
               </div>
-
               <div className="flex justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm(false)}
-                  className="text-xs bg-white/5 hover:bg-white/10 px-3 py-2 rounded-xl text-muted-foreground hover:text-white cursor-pointer font-bold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="text-xs bg-primary text-black hover:bg-primary/90 px-4 py-2 rounded-xl font-bold disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
-                >
+                <button type="button" onClick={() => setShowAddForm(false)} className="text-xs bg-white/5 hover:bg-white/10 px-3 py-2 rounded-xl text-muted-foreground hover:text-white cursor-pointer font-bold">Cancel</button>
+                <button type="submit" disabled={isSubmitting} className="text-xs bg-primary text-black hover:bg-primary/90 px-4 py-2 rounded-xl font-bold disabled:opacity-50 cursor-pointer flex items-center gap-1.5">
                   {isSubmitting ? <Loader2 size={12} className="animate-spin" /> : 'Submit Proposal'}
                 </button>
               </div>
@@ -464,61 +502,74 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
         )}
       </AnimatePresence>
 
-      {/* Tabs: Open Ideas vs Queued */}
-      <div className="flex bg-[#0c0d12]/60 p-1 rounded-xl border border-white/10 w-fit shrink-0 select-none">
-        <button
-          onClick={() => setActiveTab('open')}
-          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-            activeTab === 'open' ? 'bg-white text-black' : 'text-muted-foreground hover:text-white'
-          }`}
-        >
-          <Lightbulb size={12} /> Open Ideas ({openIdeas.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('queued')}
-          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-            activeTab === 'queued' ? 'bg-white text-black' : 'text-muted-foreground hover:text-white'
-          }`}
-        >
-          <ListOrdered size={12} /> Execution Queue ({queuedIdeas.length})
-        </button>
+      {/* 4-Tab Navigation */}
+      <div className="flex flex-wrap bg-[#0c0d12]/60 p-1 rounded-xl border border-white/10 w-fit shrink-0 select-none gap-0.5">
+        {tabs.map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === tab.key ? 'bg-white text-black' : 'text-muted-foreground hover:text-white'
+            }`}>
+            {tab.icon} {tab.label} ({tab.count})
+          </button>
+        ))}
       </div>
 
-      {/* Queue Info Banner */}
-      {activeTab === 'queued' && (
-        <div className="flex items-start gap-2.5 bg-purple-500/5 border border-purple-500/10 rounded-2xl p-3.5 text-[11px] text-purple-300/80 leading-relaxed">
-          <ArrowRightCircle size={14} className="shrink-0 mt-0.5 text-purple-400" />
-          <span>
-            <strong className="text-purple-300">Execution Queue</strong> — Ideas here are approved and waiting to be started as Active Work. 
-            The team has reviewed and aligned on these. Admin or creator can click "Start Work" to move them into production.
-          </span>
+      {/* Tab Banner */}
+      {bannerMessages[activeTab] && (
+        <div className={`flex items-start gap-2.5 border rounded-2xl p-3.5 text-[11px] leading-relaxed ${bannerMessages[activeTab]!.color}`}>
+          {bannerMessages[activeTab]!.icon}
+          <span>{bannerMessages[activeTab]!.text}</span>
         </div>
       )}
 
       {/* Card Listing */}
       <div className="space-y-4">
-        {activeTab === 'open' ? (
-          openIdeas.length === 0 ? (
-            <div className="text-center py-12 bg-[#09090b]/10 border border-dashed border-white/5 rounded-3xl text-muted-foreground text-xs italic">
-              No open proposals right now. Click "New Proposal" to share your idea!
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {openIdeas.map(idea => renderIdeaCard(idea))}
-            </div>
-          )
+        {currentList.length === 0 ? (
+          <div className="text-center py-12 bg-[#09090b]/10 border border-dashed border-white/5 rounded-3xl text-muted-foreground text-xs italic">
+            {emptyMessages[activeTab]}
+          </div>
         ) : (
-          queuedIdeas.length === 0 ? (
-            <div className="text-center py-12 bg-[#09090b]/10 border border-dashed border-white/5 rounded-3xl text-muted-foreground text-xs italic">
-              No ideas in queue. Move ideas here when the team agrees and they're ready for execution.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {queuedIdeas.map(idea => renderIdeaCard(idea))}
-            </div>
-          )
+          <div className="space-y-4">{currentList.map(idea => renderIdeaCard(idea))}</div>
         )}
       </div>
+
+      {/* Decline Reason Modal */}
+      <AnimatePresence>
+        {declineModalId && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            onClick={() => { setDeclineModalId(null); setDeclineReason('') }}>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-[#0d0e12] border border-white/10 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl"
+              onClick={e => e.stopPropagation()}>
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-red-500/10 rounded-xl"><XCircle size={18} className="text-red-400" /></div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Decline Proposal</h3>
+                  <p className="text-[10px] text-zinc-500">This action is recorded with your name and timestamp</p>
+                </div>
+              </div>
+              
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase text-muted-foreground font-bold">Reason for Declining *</label>
+                <textarea value={declineReason} onChange={e => setDeclineReason(e.target.value)} rows={3} autoFocus
+                  placeholder="Explain why this proposal is not approved..."
+                  className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-red-500/50 resize-none" />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button onClick={() => { setDeclineModalId(null); setDeclineReason('') }}
+                  className="text-xs bg-white/5 hover:bg-white/10 px-3 py-2 rounded-xl text-muted-foreground hover:text-white cursor-pointer font-bold">Cancel</button>
+                <button onClick={handleDeclineSubmit} disabled={isDeclining || !declineReason.trim()}
+                  className="text-xs bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 px-4 py-2 rounded-xl font-bold disabled:opacity-50 cursor-pointer flex items-center gap-1.5">
+                  {isDeclining ? <Loader2 size={12} className="animate-spin" /> : <XCircle size={12} />}
+                  Decline Proposal
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

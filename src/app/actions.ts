@@ -233,7 +233,7 @@ export async function getIdeasWithSupports() {
   try {
     const data = await prisma.work.findMany({
       where: {
-        status: { in: ['IDEA', 'QUEUED'] }
+        status: { in: ['IDEA', 'QUEUED', 'DECLINED', 'SHELVED'] }
       },
       include: {
         creator: { select: { id: true, name: true, profilePhoto: true, role: true } },
@@ -337,3 +337,148 @@ export async function toggleIdeaSupport(workId: string) {
   }
 }
 
+export async function declineIdea(workId: string, reason: string) {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Unauthorized' }
+  const user = session.user
+
+  if (!reason || !reason.trim()) return { success: false, error: 'Decline reason is required' }
+
+  try {
+    const work = await prisma.work.findUnique({ where: { id: workId } })
+    if (!work) return { success: false, error: 'Work not found' }
+
+    const isAuthorized = user.role === 'ADMIN' || work.creatorId === user.id
+    if (!isAuthorized) return { success: false, error: 'Not authorized to decline' }
+
+    await prisma.work.update({
+      where: { id: workId },
+      data: {
+        status: 'DECLINED',
+        blockedReason: reason.trim()
+      }
+    })
+
+    await logActivity(
+      'DECLINED_IDEA',
+      user.id,
+      workId,
+      `Declined proposal "${work.name}" — Reason: "${reason.trim()}"`
+    )
+
+    revalidatePath('/')
+    revalidatePath('/works')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to decline idea:', error)
+    return { success: false, error: `Database error: ${error.message || error}` }
+  }
+}
+
+export async function shelveIdea(workId: string) {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Unauthorized' }
+  const user = session.user
+
+  try {
+    const work = await prisma.work.findUnique({ where: { id: workId } })
+    if (!work) return { success: false, error: 'Work not found' }
+
+    const isAuthorized = user.role === 'ADMIN' || work.creatorId === user.id
+    if (!isAuthorized) return { success: false, error: 'Not authorized' }
+
+    await prisma.work.update({
+      where: { id: workId },
+      data: { status: 'SHELVED' }
+    })
+
+    await logActivity(
+      'SHELVED_IDEA',
+      user.id,
+      workId,
+      `Shelved proposal "${work.name}" — saved for future reconsideration`
+    )
+
+    revalidatePath('/')
+    revalidatePath('/works')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to shelve idea:', error)
+    return { success: false, error: `Database error: ${error.message || error}` }
+  }
+}
+
+export async function reviveIdea(workId: string) {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Unauthorized' }
+  const user = session.user
+
+  try {
+    const work = await prisma.work.findUnique({ where: { id: workId } })
+    if (!work) return { success: false, error: 'Work not found' }
+
+    const isAuthorized = user.role === 'ADMIN' || work.creatorId === user.id
+    if (!isAuthorized) return { success: false, error: 'Not authorized to revive' }
+
+    await prisma.work.update({
+      where: { id: workId },
+      data: { status: 'IDEA', blockedReason: null }
+    })
+
+    await logActivity(
+      'REVIVED_IDEA',
+      user.id,
+      workId,
+      `Revived proposal "${work.name}" — reopened for team review`
+    )
+
+    revalidatePath('/')
+    revalidatePath('/works')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to revive idea:', error)
+    return { success: false, error: `Database error: ${error.message || error}` }
+  }
+}
+
+export async function deleteIdea(workId: string) {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Unauthorized' }
+  const user = session.user
+
+  try {
+    const work = await prisma.work.findUnique({
+      where: { id: workId },
+      include: { supports: true }
+    })
+    if (!work) return { success: false, error: 'Work not found' }
+
+    // Only creator can delete, and only if no one has voted yet
+    if (work.creatorId !== user.id && user.role !== 'ADMIN') {
+      return { success: false, error: 'Only the proposal creator or admin can delete' }
+    }
+    if (work.supports.length > 0 && user.role !== 'ADMIN') {
+      return { success: false, error: 'Cannot delete — team members have already voted. Decline or shelve it instead.' }
+    }
+
+    // Delete relations first, then work
+    await prisma.ideaSupport.deleteMany({ where: { workId } })
+    await prisma.activityLog.deleteMany({ where: { workId } })
+    await prisma.workUpdate.deleteMany({ where: { workId } })
+    await prisma.work.delete({ where: { id: workId } })
+
+    await logActivity(
+      'DELETED_IDEA',
+      user.id,
+      undefined,
+      `Permanently deleted proposal "${work.name}"`
+    )
+
+    revalidatePath('/')
+    revalidatePath('/works')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to delete idea:', error)
+    return { success: false, error: `Database error: ${error.message || error}` }
+  }
+}
