@@ -388,9 +388,6 @@ export default async function Home() {
           <LeaderboardSection />
         </Suspense>
       </div>
-
-      {/* How It Works Guide — Full Width */}
-      <WorkspaceGuideCard />
     </div>
   )
 }
