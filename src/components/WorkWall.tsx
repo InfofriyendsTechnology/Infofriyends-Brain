@@ -25,14 +25,21 @@ function CustomDropdown({
   chevronColor?: string
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null)
   const activeOption = options.find(o => o.value === value) || options[0]
 
+  const handleOpen = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setTriggerRect(rect)
+    setIsOpen(!isOpen)
+  }
+
   return (
-    <div className="relative select-none z-30">
+    <div className="relative select-none">
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between gap-2 bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs font-bold text-white hover:border-white/20 transition-all cursor-pointer min-w-[145px]"
+        onClick={handleOpen}
+        className="flex items-center justify-between gap-2 bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs font-bold text-white hover:border-white/20 transition-all cursor-pointer min-w-[140px]"
       >
         <div className="flex items-center gap-1 text-left">
           <span className="text-[10px] text-muted-foreground uppercase">{label}:</span>
@@ -41,36 +48,50 @@ function CustomDropdown({
         <span className={`text-[9px] ${chevronColor} transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>▼</span>
       </button>
 
-      {isOpen && (
-        <>
-          {/* Click-away backdrop */}
-          <div className="fixed inset-0 z-20" onClick={() => setIsOpen(false)} />
-          
-          <motion.div
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="absolute right-0 mt-1.5 w-48 bg-[#0d0e12] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-30 backdrop-blur-xl"
-          >
-            <div className="py-1 max-h-60 overflow-y-auto custom-scrollbar">
-              {options.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    onChange(opt.value)
-                    setIsOpen(false)
-                  }}
-                  className={`w-full text-left px-3.5 py-2.5 text-xs transition-colors hover:bg-white/5 cursor-pointer uppercase font-semibold ${
-                    opt.value === value ? 'text-[#63BDF2] bg-[#63BDF2]/5 font-bold' : 'text-white'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        </>
-      )}
+      <AnimatePresence>
+        {isOpen && triggerRect && (
+          <>
+            {/* Full-screen click-away backdrop — z-[998] so below panel */}
+            <div
+              className="fixed inset-0 z-[998]"
+              onClick={() => setIsOpen(false)}
+            />
+
+            {/* Dropdown panel — fixed positioned, always on top of EVERYTHING */}
+            <motion.div
+              initial={{ opacity: 0, y: 6, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 4, scale: 0.97 }}
+              transition={{ duration: 0.15 }}
+              style={{
+                position: 'fixed',
+                top: triggerRect.bottom + 6,
+                right: window.innerWidth - triggerRect.right,
+                zIndex: 999,
+              }}
+              className="w-52 bg-[#0d0e12] border border-white/15 rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.7)] overflow-hidden backdrop-blur-xl"
+            >
+              <div className="py-1 max-h-64 overflow-y-auto custom-scrollbar">
+                {options.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      onChange(opt.value)
+                      setIsOpen(false)
+                    }}
+                    className={`w-full text-left px-4 py-3 text-xs transition-colors hover:bg-white/5 cursor-pointer uppercase font-semibold tracking-wide ${
+                      opt.value === value ? 'text-[#63BDF2] bg-[#63BDF2]/8 font-black' : 'text-white/80'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
