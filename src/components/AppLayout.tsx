@@ -4,9 +4,11 @@ import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
 import { useStore } from '@/store/useStore'
-import { Plus, HelpCircle } from 'lucide-react'
+import { Plus, HelpCircle, Notebook } from 'lucide-react'
 import { AnimatePresence } from 'framer-motion'
 import HelpGuideModal from './HelpGuideModal'
+import NotificationsDropdown from './NotificationsDropdown'
+import NotesDrawer from './NotesDrawer'
 
 export default function AppLayout({ children, session }: { children: React.ReactNode, session: any }) {
   const pathname = usePathname()
@@ -14,6 +16,7 @@ export default function AppLayout({ children, session }: { children: React.React
   const isChatPage = pathname === '/chat'
   const { isNavbarHidden, setAddWorkModalOpen } = useStore()
   const [isHelpOpen, setIsHelpOpen] = useState(false)
+  const [isNotesOpen, setIsNotesOpen] = useState(false)
 
   if (isLoginPage) {
     return (
@@ -42,15 +45,30 @@ export default function AppLayout({ children, session }: { children: React.React
         </div>
       </main>
 
-      {/* Global Context Help Handbook Button (floating on all pages) */}
+      {/* Global Utilities Toolbar (floating on all pages) */}
       {!isLoginPage && (
-        <button
-          onClick={() => setIsHelpOpen(true)}
-          className="fixed top-5 right-5 z-40 bg-zinc-950/60 hover:bg-[#63BDF2]/10 border border-white/5 hover:border-[#63BDF2]/20 text-[#63BDF2] w-9 h-9 rounded-xl flex items-center justify-center backdrop-blur-md shadow-lg transition-all active:scale-95 hover:scale-105 cursor-pointer"
-          title="OS Handbook (How to work)"
-        >
-          <HelpCircle size={16} />
-        </button>
+        <div className="fixed top-5 right-5 z-40 flex items-center gap-2">
+          {/* Notifications Dropdown */}
+          <NotificationsDropdown />
+
+          {/* Personal Notes Drawer Trigger */}
+          <button
+            onClick={() => setIsNotesOpen(true)}
+            className="bg-zinc-950/60 border border-white/5 hover:border-white/10 text-zinc-400 hover:text-white w-9 h-9 rounded-xl flex items-center justify-center backdrop-blur-md shadow-lg transition-all active:scale-95 hover:scale-105 cursor-pointer"
+            title="Personal Notes & Reminders"
+          >
+            <Notebook size={15} />
+          </button>
+
+          {/* Context Help Handbook Button */}
+          <button
+            onClick={() => setIsHelpOpen(true)}
+            className="bg-zinc-950/60 border border-white/5 hover:border-[#63BDF2]/20 text-[#63BDF2] w-9 h-9 rounded-xl flex items-center justify-center backdrop-blur-md shadow-lg transition-all active:scale-95 hover:scale-105 cursor-pointer"
+            title="OS Handbook (How to work)"
+          >
+            <HelpCircle size={16} />
+          </button>
+        </div>
       )}
 
       {/* HandBook Fullscreen Modal */}
@@ -63,6 +81,9 @@ export default function AppLayout({ children, session }: { children: React.React
           />
         )}
       </AnimatePresence>
+
+      {/* Personal Notes Drawer */}
+      <NotesDrawer isOpen={isNotesOpen} onClose={() => setIsNotesOpen(false)} />
 
       {/* Mobile Floating Action Button (FAB) to start new work */}
       {session && !isLoginPage && pathname === '/works' && (

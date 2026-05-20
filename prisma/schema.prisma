@@ -44,6 +44,8 @@ model User {
   typingStates      TypingState[]
   ideaSupports      IdeaSupport[]
   workReviews       WorkReview[]
+  notes             Note[]
+  notifications     Notification[]
 }
 
 model Work {
@@ -180,4 +182,31 @@ model WorkReview {
   createdAt DateTime @default(now())
 
   @@unique([workId, reviewerId])
+}
+
+model Note {
+  id          String    @id @default(cuid())
+  title       String
+  content     String    @db.Text
+  color       String    @default("#63BDF2")
+  reminderAt  DateTime?
+  
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  title       String
+  message     String   @db.Text
+  type        String   @default("INFO") // INFO, WARNING, REMINDER, BLOCKER
+  isRead      Boolean  @default(false)
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
 }

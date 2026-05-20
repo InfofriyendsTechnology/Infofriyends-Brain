@@ -88,4 +88,4 @@ sequenceDiagram
 
 ---
 
-*Document Author: Antigravity AI, working on behalf of Infofriyends Technology.*
+*Document Author: Infofriyends Technology Team.*
