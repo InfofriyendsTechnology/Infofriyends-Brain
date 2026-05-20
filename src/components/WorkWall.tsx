@@ -34,6 +34,22 @@ function CustomDropdown({
     setIsOpen(!isOpen)
   }
 
+  const getDropdownStyle = () => {
+    if (!triggerRect) return {}
+    const dropdownWidth = 208 // w-52 is 13rem = 208px
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 360
+    
+    // Position left aligned with trigger button, bounded by viewport edges (min 8px gap)
+    const left = Math.max(8, Math.min(triggerRect.left, viewportWidth - dropdownWidth - 8))
+    
+    return {
+      position: 'fixed' as const,
+      top: triggerRect.bottom + 6,
+      left,
+      zIndex: 999,
+    }
+  }
+
   return (
     <div className="relative select-none">
       <button
@@ -63,12 +79,7 @@ function CustomDropdown({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 4, scale: 0.97 }}
               transition={{ duration: 0.15 }}
-              style={{
-                position: 'fixed',
-                top: triggerRect.bottom + 6,
-                right: window.innerWidth - triggerRect.right,
-                zIndex: 999,
-              }}
+              style={getDropdownStyle()}
               className="w-52 bg-[#0d0e12] border border-white/15 rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.7)] overflow-hidden backdrop-blur-xl"
             >
               <div className="py-1 max-h-64 overflow-y-auto custom-scrollbar">
