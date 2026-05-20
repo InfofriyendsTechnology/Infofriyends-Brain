@@ -118,7 +118,7 @@ async function LeaderboardSection() {
     members = await getMembers()
   } catch (e) {}
 
-  return <MemberLeaderboard members={members} />
+  return <MemberLeaderboard members={members} limit={3} />
 }
 
 function LeaderboardSkeleton() {

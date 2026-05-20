@@ -421,7 +421,7 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
                 disabled={isUpdating}
                 className="bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 text-red-400 px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
               >
-                Block Work
+                Stop/Pause Work
               </button>
             )}
 
@@ -450,16 +450,27 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
 
           {/* Block Reason Form Dialog (Inline overlay) */}
           {showBlockInput && (
-            <div className="mt-3 p-3 bg-red-950/20 border border-red-500/30 rounded-2xl space-y-2">
-              <label className="text-[9px] uppercase font-bold text-red-400">Specify Block Reason</label>
-              <input 
-                type="text"
-                placeholder="e.g. Waiting on AWS server credentials..."
-                value={blockReason}
-                onChange={(e) => setBlockReason(e.target.value)}
-                className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-red-500/50"
-              />
-              <div className="flex gap-2 justify-end">
+            <div className="mt-3 p-3 bg-red-950/20 border border-red-500/30 rounded-2xl space-y-3">
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase font-bold text-red-400">Stop Duration (Optional)</label>
+                <input 
+                  type="text"
+                  placeholder="e.g. 2 days, 1 week..."
+                  id="stop-duration-input"
+                  className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-red-500/50"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase font-bold text-red-400">Specify Block/Stop Reason</label>
+                <input 
+                  type="text"
+                  placeholder="e.g. Waiting on AWS server credentials..."
+                  value={blockReason}
+                  onChange={(e) => setBlockReason(e.target.value)}
+                  className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-red-500/50"
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-1">
                 <button 
                   type="button"
                   onClick={() => setShowBlockInput(false)}
@@ -469,11 +480,17 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
                 </button>
                 <button 
                   type="button"
-                  onClick={submitBlockedState}
+                  onClick={() => {
+                    const durationEl = document.getElementById('stop-duration-input') as HTMLInputElement
+                    const durationStr = durationEl?.value?.trim()
+                    const finalReason = durationStr ? `[Stopped for: ${durationStr}] ${blockReason}` : blockReason
+                    if (!finalReason.trim()) return
+                    handleStatusChange('BLOCKED', pointsInput, finalReason)
+                  }}
                   disabled={!blockReason.trim()}
                   className="bg-red-500 hover:bg-red-600 text-black px-2.5 py-1 rounded-xl text-[10px] font-black disabled:opacity-50 cursor-pointer"
                 >
-                  Block Task
+                  Stop Task
                 </button>
               </div>
             </div>

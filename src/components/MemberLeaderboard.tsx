@@ -1,12 +1,19 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { Trophy, Flame, Shield, User as UserIcon } from 'lucide-react'
+import { Trophy, Flame, Shield, User as UserIcon, ArrowRight } from 'lucide-react'
 import SectionGuide from './SectionGuide'
+import Link from 'next/link'
 
-export default function MemberLeaderboard({ members }: { members: any[] }) {
-  // Sort members by contributionScore descending
+interface MemberLeaderboardProps {
+  members: any[]
+  limit?: number
+}
+
+export default function MemberLeaderboard({ members, limit }: MemberLeaderboardProps) {
   const sortedMembers = [...members].sort((a, b) => b.contributionScore - a.contributionScore)
+  const displayMembers = limit ? sortedMembers.slice(0, limit) : sortedMembers
+  const hasMore = limit && sortedMembers.length > limit
 
   return (
     <div className="bg-secondary/10 border border-border/30 rounded-3xl p-6 backdrop-blur-xl">
@@ -24,8 +31,8 @@ export default function MemberLeaderboard({ members }: { members: any[] }) {
         </div>
       </div>
 
-      <div className="space-y-4">
-        {sortedMembers.map((member, index) => {
+      <div className="space-y-3">
+        {displayMembers.map((member, index) => {
           const isTop = index === 0
           const isSecond = index === 1
           const isThird = index === 2
@@ -36,14 +43,13 @@ export default function MemberLeaderboard({ members }: { members: any[] }) {
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.05 }}
-              className={`flex items-center justify-between gap-4 p-3 rounded-2xl border transition-all duration-300 ${
+              className={`flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-300 ${
                 isTop 
                   ? 'bg-amber-500/5 border-amber-500/20 hover:border-amber-500/40' 
                   : 'bg-background/40 border-border/40 hover:border-primary/30'
               }`}
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">
-                {/* Avatar */}
                 <div className="relative shrink-0">
                   {member.profilePhoto ? (
                     <img 
@@ -73,7 +79,6 @@ export default function MemberLeaderboard({ members }: { members: any[] }) {
                 </div>
               </div>
 
-              {/* Score / Rank */}
               <div className="flex items-center gap-3 shrink-0">
                 <div className="text-right">
                   <span className="text-sm font-bold text-white block leading-none">{member.contributionScore}</span>
@@ -103,6 +108,16 @@ export default function MemberLeaderboard({ members }: { members: any[] }) {
           </div>
         )}
       </div>
+
+      {/* View All Members Link */}
+      {hasMore && (
+        <Link 
+          href="/members"
+          className="flex items-center justify-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80 bg-primary/5 border border-primary/10 hover:border-primary/20 px-4 py-2.5 rounded-xl transition-all group mt-5"
+        >
+          View All {sortedMembers.length} Members <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+        </Link>
+      )}
     </div>
   )
 }

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LayoutDashboard, Briefcase, Shield, LogOut, Plus, User, HelpCircle, MessageSquare, MoreHorizontal, EyeOff, ChevronUp, Lightbulb } from 'lucide-react'
+import { LayoutDashboard, Briefcase, Shield, LogOut, Plus, User, HelpCircle, MessageSquare, MoreHorizontal, EyeOff, ChevronUp, Lightbulb, Users } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { logoutAction } from '@/app/actions/auth'
 import { useState, useEffect } from 'react'
@@ -27,6 +27,7 @@ export default function Sidebar({ session }: { session: any }) {
     { name: 'Dashboard', href: '/', icon: <LayoutDashboard size={20} /> },
     { name: 'Workspace', href: '/works', icon: <Briefcase size={20} /> },
     { name: 'Proposals', href: '/proposals', icon: <Lightbulb size={20} /> },
+    { name: 'Team Members', href: '/members', icon: <Users size={20} /> },
     { name: 'Team Chat', href: '/chat', icon: <MessageSquare size={20} /> },
     { name: 'Profile Settings', href: '/profile', icon: <User size={20} /> },
     { name: 'How It Works', href: '/docs', icon: <HelpCircle size={20} /> },

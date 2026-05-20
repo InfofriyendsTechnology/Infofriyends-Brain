@@ -457,17 +457,17 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
   return (
     <div className="bg-secondary/20 border border-border rounded-3xl p-6 md:p-8 space-y-6">
       {/* Title Header */}
-      <div className="flex items-center justify-between pb-4 border-b border-border/30">
-        <div className="flex items-center gap-2">
-          <Lightbulb className="text-yellow-400" size={20} />
-          <h2 className="text-lg font-bold text-white tracking-tight">Proposals & Ideas Alignment</h2>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border/30">
+        <div className="flex items-center gap-2 min-w-0">
+          <Lightbulb className="text-yellow-400 shrink-0" size={20} />
+          <h2 className="text-base sm:text-lg font-bold text-white tracking-tight truncate">Proposals & Ideas</h2>
           <SectionGuide 
             title="Full Idea Lifecycle" 
             content="IDEA → Team votes Agree → QUEUED (ready for work) → ACTIVE (started). If team doesn't agree, ideas can be DECLINED (with reason) or SHELVED (maybe later). Declined/Shelved ideas can be REVIVED or permanently DELETED. Every action is timestamped with full audit trail."
           />
         </div>
         <button onClick={() => setShowAddForm(!showAddForm)}
-          className="text-xs bg-white text-black hover:bg-white/90 px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none">
+          className="text-xs bg-white text-black hover:bg-white/90 px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none shrink-0 w-full sm:w-auto justify-center">
           <Plus size={14} /> New Proposal
         </button>
       </div>
@@ -511,15 +511,17 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
       </AnimatePresence>
 
       {/* 4-Tab Navigation */}
-      <div className="flex flex-wrap bg-[#0c0d12]/60 p-1 rounded-xl border border-white/10 w-fit shrink-0 select-none gap-0.5">
+      <div className="overflow-x-auto -mx-1 px-1 scrollbar-none">
+        <div className="flex bg-[#0c0d12]/60 p-1 rounded-xl border border-white/10 w-fit select-none gap-0.5">
         {tabs.map(tab => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key)}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === tab.key ? 'bg-white text-black' : 'text-muted-foreground hover:text-white'
             }`}>
-            {tab.icon} {tab.label} ({tab.count})
+            {tab.icon} <span className="hidden min-[400px]:inline">{tab.label}</span> ({tab.count})
           </button>
         ))}
+        </div>
       </div>
 
       {/* Tab Banner */}
