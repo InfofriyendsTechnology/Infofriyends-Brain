@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Search, FolderGit2, SlidersHorizontal, Grid, List, CheckCircle2, 
@@ -26,41 +25,13 @@ function CustomDropdown({
   chevronColor?: string
 }) {
   const [isOpen, setIsOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
-  const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null)
   const activeOption = options.find(o => o.value === value) || options[0]
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  const handleOpen = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    setTriggerRect(rect)
-    setIsOpen(!isOpen)
-  }
-
-  const getDropdownStyle = () => {
-    if (!triggerRect) return {}
-    const dropdownWidth = 208 // w-52 is 13rem = 208px
-    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 360
-    
-    // Position left aligned with trigger button, bounded by viewport edges (min 8px gap)
-    const left = Math.max(8, Math.min(triggerRect.left, viewportWidth - dropdownWidth - 8))
-    
-    return {
-      position: 'fixed' as const,
-      top: triggerRect.bottom + 6,
-      left,
-      zIndex: 9999,
-    }
-  }
-
   return (
-    <div className="relative select-none">
+    <div className="relative select-none z-30">
       <button
         type="button"
-        onClick={handleOpen}
+        onClick={() => setIsOpen(!isOpen)}
         className="flex items-center justify-between gap-2 bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs font-bold text-white hover:border-white/20 transition-all cursor-pointer min-w-[140px]"
       >
         <div className="flex items-center gap-1 text-left">
@@ -71,24 +42,18 @@ function CustomDropdown({
       </button>
 
       <AnimatePresence>
-        {isOpen && triggerRect && mounted && createPortal(
+        {isOpen && (
           <>
-            {/* Full-screen click-away backdrop — z-[9998] so below panel */}
-            <div
-              className="fixed inset-0 z-[9998]"
-              onClick={() => setIsOpen(false)}
-            />
-
-            {/* Dropdown panel — fixed positioned, always on top of EVERYTHING */}
+            {/* Click-away backdrop */}
+            <div className="fixed inset-0 z-20" onClick={() => setIsOpen(false)} />
+            
             <motion.div
-              initial={{ opacity: 0, y: 6, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 4, scale: 0.97 }}
-              transition={{ duration: 0.15 }}
-              style={getDropdownStyle()}
-              className="w-52 bg-[#0d0e12] border border-white/15 rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.7)] overflow-hidden backdrop-blur-xl"
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 5 }}
+              className="absolute left-0 mt-1.5 w-48 bg-[#0d0e12] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-40 backdrop-blur-xl"
             >
-              <div className="py-1 max-h-64 overflow-y-auto custom-scrollbar">
+              <div className="py-1 max-h-60 overflow-y-auto custom-scrollbar">
                 {options.map((opt) => (
                   <button
                     key={opt.value}
@@ -97,8 +62,8 @@ function CustomDropdown({
                       onChange(opt.value)
                       setIsOpen(false)
                     }}
-                    className={`w-full text-left px-4 py-3 text-xs transition-colors hover:bg-white/5 cursor-pointer uppercase font-semibold tracking-wide ${
-                      opt.value === value ? 'text-[#63BDF2] bg-[#63BDF2]/8 font-black' : 'text-white/80'
+                    className={`w-full text-left px-3.5 py-2.5 text-xs transition-colors hover:bg-white/5 cursor-pointer uppercase font-semibold ${
+                      opt.value === value ? 'text-[#63BDF2] bg-[#63BDF2]/5 font-bold' : 'text-white'
                     }`}
                   >
                     {opt.label}
@@ -106,8 +71,7 @@ function CustomDropdown({
                 ))}
               </div>
             </motion.div>
-          </>,
-          document.body
+          </>
         )}
       </AnimatePresence>
     </div>
@@ -261,7 +225,7 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
       </div>
 
       {/* Control Bar: Search & Select Dropdown Filters */}
-      <div className="bg-[#09090b]/40 border border-white/5 p-4 rounded-3xl backdrop-blur-xl flex flex-col xl:flex-row gap-4 items-stretch xl:items-center justify-between">
+      <div className="relative z-40 bg-[#09090b]/40 border border-white/5 p-4 rounded-3xl backdrop-blur-xl flex flex-col xl:flex-row gap-4 items-stretch xl:items-center justify-between">
         
         {/* Left: Search Box */}
         <div className="relative flex-1 min-w-[240px]">
