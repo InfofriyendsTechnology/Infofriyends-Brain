@@ -1,7 +1,6 @@
 import { getWorks, getCommunityPosts, getIdeasWithSupports } from '@/app/actions'
 import { getMembers } from '@/app/actions/admin'
 import { getSession } from '@/lib/auth'
-import AddWorkModal from '@/components/AddWorkModal'
 import MemberLeaderboard from '@/components/MemberLeaderboard'
 import DashboardMetrics from '@/components/DashboardMetrics'
 import WorkCard from '@/components/WorkCard'
@@ -304,10 +303,7 @@ export default async function Home() {
   const session = await getSession()
 
   return (
-    <div className="space-y-8 pb-20 w-full px-4 sm:px-6 lg:px-12 pt-6">
-      {session && <AddWorkModal user={session.user} />}
-
-      {/* Header Banner (Instant Render) */}
+    <div className="space-y-8 pb-20 w-full px-4 sm:px-6 lg:px-12 pt-6">      {/* Header Banner (Instant Render) */}
       <div className="relative overflow-hidden rounded-3xl border border-border/40 bg-gradient-to-br from-secondary/15 via-background to-secondary/10 p-6 md:p-8 backdrop-blur-xl">
         <div className="absolute top-0 right-0 w-80 h-80 bg-[#63BDF2]/10 rounded-full blur-[100px] pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-60 h-60 bg-[#3188DA]/5 rounded-full blur-[80px] pointer-events-none" />

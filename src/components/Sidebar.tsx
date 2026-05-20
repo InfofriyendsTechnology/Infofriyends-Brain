@@ -78,19 +78,7 @@ export default function Sidebar({ session }: { session: any }) {
             )
           })}
 
-          {/* Quick Action Button */}
-          {session && (
-            <div className="pt-4 border-t border-border/30 mt-4">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setAddWorkModalOpen(true)}
-                className="w-full flex items-center justify-center gap-2 bg-white text-black py-3 rounded-xl font-bold text-sm hover:bg-white/90 transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)]"
-              >
-                <Plus size={16} /> Add New Work
-              </motion.button>
-            </div>
-          )}
+
         </nav>
 
         {/* Greetings & User Profile Footer */}

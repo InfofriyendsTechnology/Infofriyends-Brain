@@ -2,7 +2,6 @@ import { getWorks } from '@/app/actions'
 import { getSession } from '@/lib/auth'
 import WorkWall from '@/components/WorkWall'
 import AddWorkModal from '@/components/AddWorkModal'
-import CreateWorkTrigger from '@/components/CreateWorkTrigger'
 import { Briefcase } from 'lucide-react'
 import { Suspense } from 'react'
 
@@ -74,10 +73,7 @@ export default async function WorksPage() {
   const session = await getSession()
 
   return (
-    <div className="space-y-8 pb-20 w-full px-4 sm:px-6 lg:px-12 pt-6">
-      {session && <AddWorkModal user={session.user} />}
-
-      {/* Header Banner */}
+    <div className="space-y-8 pb-20 w-full px-4 sm:px-6 lg:px-12 pt-6">      {/* Header Banner */}
       <div className="relative overflow-hidden rounded-3xl border border-border/40 bg-gradient-to-br from-secondary/15 via-background to-secondary/10 p-6 md:p-8 backdrop-blur-xl">
         <div className="absolute top-0 right-0 w-80 h-80 bg-[#63BDF2]/10 rounded-full blur-[100px] pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-60 h-60 bg-[#3188DA]/5 rounded-full blur-[80px] pointer-events-none" />
@@ -94,7 +90,6 @@ export default async function WorksPage() {
               Active tasks, ongoing projects, and daily operations. Items appear here after team proposals are approved and converted to work.
             </p>
           </div>
-          {session && <CreateWorkTrigger />}
         </div>
       </div>
 
