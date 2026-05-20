@@ -1,15 +1,19 @@
 'use client'
 
+import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
 import { useStore } from '@/store/useStore'
-import { Plus } from 'lucide-react'
+import { Plus, HelpCircle } from 'lucide-react'
+import { AnimatePresence } from 'framer-motion'
+import HelpGuideModal from './HelpGuideModal'
 
 export default function AppLayout({ children, session }: { children: React.ReactNode, session: any }) {
   const pathname = usePathname()
   const isLoginPage = pathname === '/login'
   const isChatPage = pathname === '/chat'
   const { isNavbarHidden, setAddWorkModalOpen } = useStore()
+  const [isHelpOpen, setIsHelpOpen] = useState(false)
 
   if (isLoginPage) {
     return (
@@ -37,6 +41,28 @@ export default function AppLayout({ children, session }: { children: React.React
           {children}
         </div>
       </main>
+
+      {/* Global Context Help Handbook Button (floating on all pages) */}
+      {!isLoginPage && (
+        <button
+          onClick={() => setIsHelpOpen(true)}
+          className="fixed top-5 right-5 z-40 bg-zinc-950/60 hover:bg-[#63BDF2]/10 border border-white/5 hover:border-[#63BDF2]/20 text-[#63BDF2] w-9 h-9 rounded-xl flex items-center justify-center backdrop-blur-md shadow-lg transition-all active:scale-95 hover:scale-105 cursor-pointer"
+          title="OS Handbook (How to work)"
+        >
+          <HelpCircle size={16} />
+        </button>
+      )}
+
+      {/* HandBook Fullscreen Modal */}
+      <AnimatePresence>
+        {isHelpOpen && (
+          <HelpGuideModal 
+            isOpen={isHelpOpen} 
+            onClose={() => setIsHelpOpen(false)} 
+            currentPath={pathname} 
+          />
+        )}
+      </AnimatePresence>
 
       {/* Mobile Floating Action Button (FAB) to start new work */}
       {session && !isLoginPage && pathname === '/works' && (
