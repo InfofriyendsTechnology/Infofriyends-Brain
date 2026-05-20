@@ -67,6 +67,58 @@ export async function createWork(formData: FormData) {
   }
 }
 
+export async function editWork(id: string, formData: FormData) {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Unauthorized' }
+  const user = session.user
+
+  const name = formData.get('name') as string
+  const description = formData.get('description') as string
+  const assigneeId = formData.get('assigneeId') as string || null
+  const priority = formData.get('priority') as string || 'MEDIUM'
+  const dueDateStr = formData.get('dueDate') as string
+
+  if (!name || !description) return { success: false, error: 'Missing required fields' }
+
+  let dueDate: Date | null = null
+  if (dueDateStr) {
+    try { dueDate = new Date(dueDateStr) } catch (e) {}
+  }
+
+  try {
+    const work = await prisma.work.findUnique({ where: { id } })
+    if (!work) return { success: false, error: 'Work not found' }
+
+    const isAuthorized = user.role === 'ADMIN' || work.creatorId === user.id
+    if (!isAuthorized) return { success: false, error: 'Not authorized to edit' }
+
+    await prisma.work.update({
+      where: { id },
+      data: {
+        name,
+        description,
+        priority,
+        dueDate,
+        assigneeId: assigneeId || null,
+        ...(user.role === 'ADMIN' && work.creatorId !== user.id && {
+          editedByAdminId: user.id,
+          editReason: 'Admin edited work details'
+        })
+      }
+    })
+
+    await logActivity('UPDATED_WORK', user.id, id, `Edited details of work: "${name}"`)
+    
+    revalidatePath('/')
+    revalidatePath('/works')
+    revalidatePath('/proposals')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to edit work:', error)
+    return { success: false, error: `Database error: ${error.message || error}` }
+  }
+}
+
 export async function updateWorkStatus(id: string, newStatus: string, customPoints?: number, blockedReason?: string) {
   const session = await getSession()
   if (!session) return { success: false, error: 'Unauthorized' }

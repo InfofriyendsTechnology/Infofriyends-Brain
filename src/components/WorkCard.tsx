@@ -1,11 +1,11 @@
 'use client'
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { updateWorkStatus, addWorkUpdate } from '@/app/actions'
+import { updateWorkStatus, addWorkUpdate, editWork } from '@/app/actions'
 import { useState } from 'react'
 import { 
   CheckCircle2, Circle, Archive, Clock, ShieldAlert, Sparkles, 
-  User, ChevronDown, ChevronUp, AlertTriangle, MessageSquare, Plus, Loader2, Lightbulb, Zap 
+  User, ChevronDown, ChevronUp, AlertTriangle, MessageSquare, Plus, Loader2, Lightbulb, Zap, Trash2, Edit2, X
 } from 'lucide-react'
 
 export default function WorkCard({ work, currentUser }: { work: any, currentUser: any }) {
@@ -17,11 +17,21 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
   const [blockReason, setBlockReason] = useState('')
   const [pointsInput, setPointsInput] = useState(work.points || 10)
 
+  // Edit State
+  const [isEditing, setIsEditing] = useState(false)
+  const [editName, setEditName] = useState(work.name)
+  const [editDesc, setEditDesc] = useState(work.description)
+
+  // Delete State
+  const [showDeleteInput, setShowDeleteInput] = useState(false)
+  const [deleteReason, setDeleteReason] = useState('')
+
   const isCompleted = work.status === 'COMPLETED'
   const isArchived = work.status === 'ARCHIVED'
   const isBlocked = work.status === 'BLOCKED'
   const isIdea = work.status === 'IDEA'
   const isActive = work.status === 'ACTIVE'
+  const isDeleted = work.status === 'DELETED'
 
   const isAdmin = currentUser?.role === 'ADMIN'
   const isCreatorOrAssignee = currentUser && (work.creatorId === currentUser.id || work.assigneeId === currentUser.id)
@@ -57,6 +67,31 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
       console.error(e)
     } finally {
       setIsPostingUpdate(false)
+    }
+  }
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editName.trim() || !editDesc.trim()) return
+    setIsUpdating(true)
+    try {
+      const formData = new FormData()
+      formData.append('name', editName)
+      formData.append('description', editDesc)
+      formData.append('priority', work.priority)
+      if (work.assigneeId) formData.append('assigneeId', work.assigneeId)
+      if (work.dueDate) formData.append('dueDate', new Date(work.dueDate).toISOString())
+      
+      const res = await editWork(work.id, formData)
+      if (res.success) {
+        setIsEditing(false)
+      } else {
+        alert(res.error)
+      }
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setIsUpdating(false)
     }
   }
 
@@ -132,6 +167,12 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
             <Archive size={10} className="shrink-0" /> Archived
           </span>
         )
+      case 'DELETED':
+        return (
+          <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-red-400 bg-red-900/40 border border-red-500/30 px-2.5 py-0.5 rounded-full select-none">
+            <Trash2 size={10} className="shrink-0" /> Deleted
+          </span>
+        )
       default:
         return (
           <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-white bg-white/10 border border-white/20 px-2.5 py-0.5 rounded-full select-none">
@@ -176,17 +217,19 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       className={`relative group p-6 rounded-3xl border transition-all duration-300 flex flex-col h-full overflow-hidden bg-gradient-to-br ${
-        isCompleted 
-          ? 'from-secondary/15 via-[#0d0e12] to-secondary/10 border-emerald-500/20 shadow-lg shadow-emerald-500/5' 
-          : isArchived
-            ? 'from-transparent to-transparent border-dashed border-white/5 opacity-55'
-            : isBlocked
-              ? 'from-red-950/5 via-[#0d0e12] to-red-950/0 border-red-500/30'
-              : 'from-[#0d0e12] via-[#09090b] to-secondary/20 border-white/10 hover:border-[#63BDF2]/40 hover:shadow-2xl hover:shadow-[#63BDF2]/5'
+        isDeleted
+          ? 'from-red-950/20 via-[#0d0e12] to-red-950/10 border-red-900/50 opacity-60 grayscale'
+          : isCompleted 
+            ? 'from-secondary/15 via-[#0d0e12] to-secondary/10 border-emerald-500/20 shadow-lg shadow-emerald-500/5' 
+            : isArchived
+              ? 'from-transparent to-transparent border-dashed border-white/5 opacity-55'
+              : isBlocked
+                ? 'from-red-950/5 via-[#0d0e12] to-red-950/0 border-red-500/30'
+                : 'from-[#0d0e12] via-[#09090b] to-secondary/20 border-white/10 hover:border-[#63BDF2]/40 hover:shadow-2xl hover:shadow-[#63BDF2]/5'
       }`}
     >
       {/* Decorative Glow */}
-      {!isArchived && !isCompleted && !isBlocked && (
+      {!isArchived && !isCompleted && !isBlocked && !isDeleted && (
         <div className="absolute top-0 right-0 w-24 h-24 bg-[#63BDF2]/5 rounded-full blur-2xl group-hover:bg-[#63BDF2]/10 transition-all pointer-events-none" />
       )}
 
@@ -199,16 +242,38 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
         </div>
 
         {/* Name and Description */}
-        <div className="space-y-1.5">
-          <h3 className={`text-base font-bold tracking-tight leading-snug text-white ${
-            isCompleted || isArchived ? 'line-through text-muted-foreground' : ''
-          }`}>
-            {work.name}
-          </h3>
-          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
-            {work.description}
-          </p>
-        </div>
+        {isEditing ? (
+          <form onSubmit={handleEditSubmit} className="space-y-2">
+            <input 
+              autoFocus
+              type="text" 
+              value={editName}
+              onChange={e => setEditName(e.target.value)}
+              className="w-full bg-[#0c0d12]/80 border border-[#63BDF2]/40 rounded-xl px-3 py-1.5 text-sm font-bold text-white focus:outline-none"
+            />
+            <textarea 
+              value={editDesc}
+              onChange={e => setEditDesc(e.target.value)}
+              rows={3}
+              className="w-full bg-[#0c0d12]/80 border border-[#63BDF2]/40 rounded-xl px-3 py-1.5 text-xs text-zinc-300 focus:outline-none resize-none"
+            />
+            <div className="flex justify-end gap-2 pt-1">
+              <button type="button" onClick={() => setIsEditing(false)} className="text-[10px] text-zinc-400 hover:text-white px-2 py-1">Cancel</button>
+              <button type="submit" disabled={isUpdating} className="bg-[#63BDF2] text-black px-3 py-1 text-[10px] font-black rounded-lg hover:bg-[#3188DA]">Save</button>
+            </div>
+          </form>
+        ) : (
+          <div className="space-y-1.5">
+            <h3 className={`text-base font-bold tracking-tight leading-snug text-white ${
+              isCompleted || isArchived || isDeleted ? 'line-through text-muted-foreground' : ''
+            }`}>
+              {work.name}
+            </h3>
+            <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
+              {work.description}
+            </p>
+          </div>
+        )}
 
         {/* Due Date Indicator */}
         {work.dueDate && (
@@ -218,11 +283,14 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
           </div>
         )}
 
-        {/* Blocked Reason Banner */}
-        {isBlocked && work.blockedReason && (
-          <div className="p-3 bg-red-500/5 border border-red-500/20 text-red-400 rounded-2xl text-xs space-y-1">
+        {/* Blocked or Deleted Reason Banner */}
+        {((isBlocked || isDeleted) && work.blockedReason) && (
+          <div className={`p-3 border rounded-2xl text-xs space-y-1 ${
+            isDeleted ? 'bg-red-950/20 border-red-900/40 text-red-500' : 'bg-red-500/5 border-red-500/20 text-red-400'
+          }`}>
             <div className="font-black uppercase text-[9px] tracking-wider flex items-center gap-1">
-              <AlertTriangle size={12} /> Blocked Reason:
+              {isDeleted ? <Trash2 size={12} /> : <AlertTriangle size={12} />} 
+              {isDeleted ? 'Deletion Note:' : 'Blocked Reason:'}
             </div>
             <p className="italic leading-relaxed">{work.blockedReason}</p>
           </div>
@@ -437,7 +505,7 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
             )}
 
             {/* Transition: Send back to Idea */}
-            {(isCompleted || isArchived || isBlocked) && (
+            {(isCompleted || isArchived || isBlocked || isDeleted) && (
               <button 
                 onClick={() => handleStatusChange('IDEA')}
                 disabled={isUpdating}
@@ -445,6 +513,27 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
               >
                 Move to Idea
               </button>
+            )}
+
+            {/* Edit / Delete actions for Creator */}
+            {isAuthorized && !isDeleted && (
+              <>
+                <div className="w-px h-4 bg-white/10 mx-1" />
+                <button 
+                  onClick={() => setIsEditing(!isEditing)}
+                  disabled={isUpdating}
+                  className="bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                >
+                  <Edit2 size={10} /> Edit
+                </button>
+                <button 
+                  onClick={() => setShowDeleteInput(true)}
+                  disabled={isUpdating}
+                  className="bg-red-900/20 hover:bg-red-900/40 border border-red-500/20 text-red-500 px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                >
+                  <Trash2 size={10} /> Delete
+                </button>
+              </>
             )}
           </div>
 
@@ -491,6 +580,44 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
                   className="bg-red-500 hover:bg-red-600 text-black px-2.5 py-1 rounded-xl text-[10px] font-black disabled:opacity-50 cursor-pointer"
                 >
                   Stop Task
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Delete Reason Form Dialog */}
+          {showDeleteInput && (
+            <div className="mt-3 p-3 bg-red-950/20 border border-red-500/30 rounded-2xl space-y-3">
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase font-bold text-red-400">Reason for Deletion</label>
+                <input 
+                  type="text"
+                  placeholder="e.g. Duplicate task, No longer needed..."
+                  value={deleteReason}
+                  onChange={(e) => setDeleteReason(e.target.value)}
+                  className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-red-500/50"
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-1">
+                <button 
+                  type="button"
+                  onClick={() => setShowDeleteInput(false)}
+                  className="px-2 py-1 text-[10px] text-zinc-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    if (!deleteReason.trim()) return
+                    const finalReason = `[Deleted by ${currentUser?.name || 'Creator'}] ${deleteReason}`
+                    handleStatusChange('DELETED', pointsInput, finalReason)
+                    setShowDeleteInput(false)
+                  }}
+                  disabled={!deleteReason.trim()}
+                  className="bg-red-500 hover:bg-red-600 text-black px-2.5 py-1 rounded-xl text-[10px] font-black disabled:opacity-50 cursor-pointer"
+                >
+                  Confirm Delete
                 </button>
               </div>
             </div>

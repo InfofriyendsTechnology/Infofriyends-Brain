@@ -95,11 +95,11 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
 
   const statusOptions = [
     { value: 'ALL', label: 'All Statuses' },
-    { value: 'IDEA', label: 'Idea' },
     { value: 'ACTIVE', label: 'Active' },
     { value: 'BLOCKED', label: 'Blocked' },
     { value: 'COMPLETED', label: 'Completed' },
     { value: 'ARCHIVED', label: 'Archived' },
+    { value: 'DELETED', label: 'Deleted' },
   ]
 
   const priorityOptions = [
@@ -127,13 +127,16 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
     loadMembers()
   }, [])
 
+  // Only show Workspace statuses (exclude Proposals)
+  const workspaceWorks = works.filter(w => !['IDEA', 'QUEUED', 'DECLINED', 'SHELVED'].includes(w.status))
+
   // Filter logic: Scope selection (Global Wall vs My Daily Focus)
-  const scopedWorks = works.filter(w => {
+  const scopedWorks = workspaceWorks.filter(w => {
     if (activeScope === 'focus') {
       if (!currentUser) return false
-      // My focus area shows works assigned to me OR blocked/idea/active works I created
+      // My focus area shows works assigned to me OR blocked/active works I created
       const isAssignedToMe = w.assigneeId === currentUser.id
-      const isCreatedByMeAndUnresolved = w.creatorId === currentUser.id && ['BLOCKED', 'IDEA', 'ACTIVE'].includes(w.status)
+      const isCreatedByMeAndUnresolved = w.creatorId === currentUser.id && ['BLOCKED', 'ACTIVE'].includes(w.status)
       return isAssignedToMe || isCreatedByMeAndUnresolved
     }
     return true
