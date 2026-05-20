@@ -5,9 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Lightbulb, Check, Plus, Clock, Calendar, 
   ThumbsUp, Loader2, Play, ListOrdered, XCircle, Pause, RotateCcw, Trash2,
-  ChevronDown, ChevronUp, History, ArrowRightCircle, AlertTriangle, Archive
+  ChevronDown, ChevronUp, History, ArrowRightCircle, AlertTriangle, Archive, Edit2
 } from 'lucide-react'
-import { createWork, updateWorkStatus, toggleIdeaSupport, queueIdea, declineIdea, shelveIdea, reviveIdea, deleteIdea } from '@/app/actions'
+import { createWork, updateWorkStatus, toggleIdeaSupport, queueIdea, declineIdea, shelveIdea, reviveIdea, deleteIdea, editWork } from '@/app/actions'
 import SectionGuide from './SectionGuide'
 
 interface Idea {
@@ -86,7 +86,7 @@ function formatRelativeTime(dateStr: string) {
 }
 
 export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: IdeaAgreementHubProps) {
-  const [activeTab, setActiveTab] = useState<'open' | 'queued' | 'declined' | 'shelved'>('open')
+  const [activeTab, setActiveTab] = useState<'open' | 'queued' | 'declined' | 'shelved' | 'deleted'>('open')
   const [showAddForm, setShowAddForm] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [votingId, setVotingId] = useState<string | null>(null)
@@ -101,10 +101,17 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
   // Delete confirmation
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
+  // Edit inline state
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editPriority, setEditPriority] = useState('MEDIUM')
+  const [editDescription, setEditDescription] = useState('')
+
   const openIdeas = ideas.filter(f => f.status === 'IDEA')
   const queuedIdeas = ideas.filter(f => f.status === 'QUEUED')
   const declinedIdeas = ideas.filter(f => f.status === 'DECLINED')
   const shelvedIdeas = ideas.filter(f => f.status === 'SHELVED')
+  const deletedIdeas = ideas.filter(f => f.status === 'DELETED')
 
   const isAdmin = currentUser?.role === 'ADMIN'
   const isCreator = (idea: Idea) => currentUser?.id === idea.creator?.id
@@ -125,6 +132,22 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     finally { setIsSubmitting(false) }
   }
 
+  async function handleEditSubmit(e: React.FormEvent<HTMLFormElement>, ideaId: string) {
+    e.preventDefault()
+    setActionId(ideaId)
+    const formData = new FormData(e.currentTarget)
+    try {
+      const res = await editWork(ideaId, formData)
+      if (res.success) {
+        setEditingId(null)
+      } else alert(res.error || 'Failed to update proposal')
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setActionId(null)
+    }
+  }
+
   async function handleVote(id: string) {
     if (!currentUser) return alert('Please login to vote')
     setVotingId(id)
@@ -137,6 +160,17 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     try {
       const res = await action()
       if (res && !res.success) alert(res.error || 'Action failed')
+    } catch (err) { console.error(err) }
+    finally { setActionId(null) }
+  }
+
+  async function handleDelete(id: string) {
+    setActionId(id)
+    try {
+      const res = await deleteIdea(id)
+      if (res.success) {
+        setDeleteConfirmId(null)
+      } else alert(res.error || 'Failed to delete')
     } catch (err) { console.error(err) }
     finally { setActionId(null) }
   }
@@ -154,17 +188,6 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     finally { setIsDeclining(false) }
   }
 
-  async function handleDelete(id: string) {
-    setActionId(id)
-    try {
-      const res = await deleteIdea(id)
-      if (res.success) {
-        setDeleteConfirmId(null)
-      } else alert(res.error || 'Failed to delete')
-    } catch (err) { console.error(err) }
-    finally { setActionId(null) }
-  }
-
   const getPriorityBadge = (p: string) => {
     switch (p) {
       case 'URGENT': return 'text-red-400 bg-red-500/10 border-red-500/20'
@@ -179,6 +202,7 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
       case 'QUEUED': return 'bg-purple-500/5 border-purple-500/15 hover:border-purple-500/25'
       case 'DECLINED': return 'bg-red-500/5 border-red-500/10 hover:border-red-500/20 opacity-80'
       case 'SHELVED': return 'bg-zinc-500/5 border-zinc-500/10 hover:border-zinc-500/20 opacity-75'
+      case 'DELETED': return 'bg-zinc-950/40 border-red-500/10 hover:border-red-500/20 opacity-70'
       default: return 'bg-[#09090b]/40 border-white/5 hover:border-white/10'
     }
   }
@@ -190,7 +214,84 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     const isQueued = idea.status === 'QUEUED'
     const isDeclined = idea.status === 'DECLINED'
     const isShelved = idea.status === 'SHELVED'
-    const isArchived = isDeclined || isShelved
+    const isDeleted = idea.status === 'DELETED'
+    const isArchived = isDeclined || isShelved || isDeleted
+
+    // Edit Inline Render
+    if (editingId === idea.id) {
+      return (
+        <motion.div 
+          key={idea.id}
+          layout
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="bg-zinc-950/40 border border-amber-500/20 p-4 sm:p-5 rounded-2xl space-y-4"
+        >
+          <form onSubmit={(e) => handleEditSubmit(e, idea.id)} className="space-y-3">
+            <h4 className="text-xs font-bold text-white uppercase flex items-center gap-1.5">
+              <Edit2 size={12} className="text-amber-400" /> Edit Proposal Details
+            </h4>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase text-zinc-500 font-bold">Proposal Title</label>
+                <input 
+                  type="text" 
+                  name="name" 
+                  required 
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500/50" 
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase text-zinc-500 font-bold">Priority</label>
+                <select 
+                  name="priority" 
+                  value={editPriority}
+                  onChange={(e) => setEditPriority(e.target.value)}
+                  className="w-full bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500/50"
+                >
+                  <option value="LOW">LOW</option>
+                  <option value="MEDIUM">MEDIUM</option>
+                  <option value="HIGH">HIGH</option>
+                  <option value="URGENT">URGENT</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="space-y-1">
+              <label className="text-[9px] uppercase text-zinc-500 font-bold">Details / Explanation</label>
+              <textarea 
+                name="description" 
+                required 
+                rows={3} 
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                className="w-full bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500/50 resize-none" 
+              />
+            </div>
+            
+            <div className="flex justify-end gap-2 pt-1">
+              <button 
+                type="button" 
+                onClick={() => setEditingId(null)} 
+                className="text-xs bg-white/5 hover:bg-white/10 px-3 py-2 rounded-xl text-zinc-400 hover:text-white cursor-pointer font-bold transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                disabled={actionId === idea.id} 
+                className="text-xs bg-amber-500 text-black hover:bg-amber-400 px-4 py-2 rounded-xl font-bold disabled:opacity-50 cursor-pointer flex items-center gap-1.5 transition-all shadow-md shadow-amber-500/5"
+              >
+                {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        </motion.div>
+      )
+    }
 
     return (
       <motion.div 
@@ -198,200 +299,316 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
         layout
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`border p-5 rounded-2xl space-y-4 transition-all ${getStatusStyle(idea.status)}`}
+        className={`border p-4 sm:p-5 md:p-6 rounded-2xl sm:rounded-3xl space-y-4 transition-all ${getStatusStyle(idea.status)}`}
       >
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-          <div className="space-y-2 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h4 className={`text-sm font-bold tracking-tight ${isArchived ? 'text-zinc-400 line-through' : 'text-white'}`}>{idea.name}</h4>
-              <span className={`text-[9px] px-1.5 py-0.5 rounded-md border font-black uppercase tracking-wider ${getPriorityBadge(idea.priority)}`}>
-                {idea.priority}
-              </span>
-              {isQueued && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/25 text-purple-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                  <ListOrdered size={10} /> In Queue
+        {/* Top Header Area: Title & Badges */}
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <h4 className={`text-sm sm:text-base font-bold tracking-tight ${isArchived ? 'text-zinc-400 line-through' : 'text-white'}`}>
+                {idea.name}
+              </h4>
+              <div className="flex flex-wrap gap-1.5 shrink-0">
+                <span className={`text-[9px] px-2 py-0.5 rounded-md border font-black uppercase tracking-wider ${getPriorityBadge(idea.priority)}`}>
+                  {idea.priority}
                 </span>
-              )}
-              {isDeclined && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-red-500/10 border border-red-500/25 text-red-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                  <XCircle size={10} /> Declined
-                </span>
-              )}
-              {isShelved && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-zinc-500/10 border border-zinc-500/25 text-zinc-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                  <Pause size={10} /> Shelved
-                </span>
-              )}
-            </div>
-            <p className={`text-xs leading-relaxed whitespace-pre-wrap ${isArchived ? 'text-zinc-600' : 'text-muted-foreground'}`}>{idea.description}</p>
-            
-            {/* Decline Reason */}
-            {isDeclined && idea.blockedReason && (
-              <div className="flex items-start gap-2 bg-red-500/5 border border-red-500/10 rounded-xl p-3 mt-2">
-                <AlertTriangle size={14} className="text-red-400 shrink-0 mt-0.5" />
-                <div>
-                  <span className="text-[10px] font-bold text-red-400 uppercase">Decline Reason</span>
-                  <p className="text-[11px] text-red-300/70 leading-relaxed mt-0.5">{idea.blockedReason}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Deep Entry Details */}
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-2">
-              <div className="flex items-center gap-1.5 text-[10px] text-zinc-500">
-                <div className="shrink-0">
-                  {idea.creator?.profilePhoto ? (
-                    <img src={idea.creator.profilePhoto} alt={idea.creator.name} className="w-4 h-4 rounded-full object-cover" />
-                  ) : (
-                    <div className="w-4 h-4 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-[7px] uppercase">
-                      {idea.creator?.name?.charAt(0) || '?'}
-                    </div>
-                  )}
-                </div>
-                <span>By <strong className="text-zinc-300 font-bold">{idea.creator?.name || 'Unknown'}</strong></span>
-              </div>
-              <div className="flex items-center gap-1 text-[10px] text-zinc-500" suppressHydrationWarning>
-                <Calendar size={10} className="text-zinc-600" />
-                <span suppressHydrationWarning>{formatDateTime(idea.createdAt)}</span>
-              </div>
-              <div className="flex items-center gap-1 text-[10px] text-zinc-500" suppressHydrationWarning>
-                <Clock size={10} className="text-zinc-600" />
-                <span suppressHydrationWarning>{formatRelativeTime(idea.createdAt)}</span>
+                {isQueued && (
+                  <span className="text-[9px] px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/25 text-purple-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                    <ListOrdered size={10} /> In Queue
+                  </span>
+                )}
+                {isDeclined && (
+                  <span className="text-[9px] px-2 py-0.5 rounded-md bg-red-500/10 border border-red-500/25 text-red-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                    <XCircle size={10} /> Declined
+                  </span>
+                )}
+                {isShelved && (
+                  <span className="text-[9px] px-2 py-0.5 rounded-md bg-zinc-500/10 border border-zinc-500/25 text-zinc-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                    <Pause size={10} /> Shelved
+                  </span>
+                )}
+                {isDeleted && (
+                  <span className="text-[9px] px-2 py-0.5 rounded-md bg-red-950/20 border border-red-500/25 text-red-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                    <Trash2 size={10} /> Deleted
+                  </span>
+                )}
               </div>
             </div>
           </div>
+          
+          <p className={`text-xs sm:text-sm leading-relaxed whitespace-pre-wrap ${isArchived ? 'text-zinc-500' : 'text-zinc-300'}`}>
+            {idea.description}
+          </p>
+        </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0 self-end sm:self-start">
-            {/* For OPEN/QUEUED ideas */}
+        {/* Decline Reason Banner */}
+        {isDeclined && idea.blockedReason && (
+          <div className="flex items-start gap-2.5 bg-red-500/5 border border-red-500/10 rounded-xl p-3 sm:p-4 mt-1">
+            <AlertTriangle size={14} className="text-red-400 shrink-0 mt-0.5" />
+            <div>
+              <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">Decline Reason</span>
+              <p className="text-[11px] sm:text-xs text-red-300/70 leading-relaxed mt-0.5">{idea.blockedReason}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Born Info / Origin Details */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-3 border-t border-white/5 text-[10px] text-zinc-500">
+          <div className="flex items-center gap-1.5">
+            <div className="shrink-0">
+              {idea.creator?.profilePhoto ? (
+                <img src={idea.creator.profilePhoto} alt={idea.creator.name} className="w-4 h-4 rounded-full object-cover ring-1 ring-white/10" />
+              ) : (
+                <div className="w-4 h-4 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-[7px] uppercase">
+                  {idea.creator?.name?.charAt(0) || '?'}
+                </div>
+              )}
+            </div>
+            <span>By <strong className="text-zinc-300 font-medium">{idea.creator?.name || 'Unknown'}</strong></span>
+          </div>
+          <div className="flex items-center gap-1" suppressHydrationWarning>
+            <Calendar size={11} className="text-zinc-600" />
+            <span suppressHydrationWarning>{formatDateTime(idea.createdAt)}</span>
+          </div>
+          <div className="flex items-center gap-1" suppressHydrationWarning>
+            <Clock size={11} className="text-zinc-600" />
+            <span suppressHydrationWarning>{formatRelativeTime(idea.createdAt)}</span>
+          </div>
+        </div>
+
+        {/* Card Footer: Support and Action Controls */}
+        <div className="border-t border-white/5 pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          
+          {/* Left Side: Support Progress or Meta Status */}
+          <div className="flex-1 min-w-0">
+            {!isArchived ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[10px] text-zinc-400">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-semibold text-white/90">Support Progress:</span>
+                    <span>{idea.supports.length} of {membersCount} agreed ({approvalRate}%)</span>
+                  </div>
+                  {approvalRate === 100 && (
+                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                      <Check size={11} /> Full Consensus
+                    </span>
+                  )}
+                </div>
+                <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-gradient-to-r from-[#63BDF2] to-blue-500 h-full rounded-full transition-all duration-500 ease-out" 
+                    style={{ width: `${Math.min(100, approvalRate)}%` }} 
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="text-[10px] text-zinc-500 italic">
+                {isDeleted 
+                  ? 'Archived proposal (deleted by creator/admin)' 
+                  : isDeclined 
+                    ? 'Archived proposal (declined by team)' 
+                    : 'Archived proposal (shelved for later)'}
+              </div>
+            )}
+          </div>
+
+          {/* Right Side: Action Trigger Trays */}
+          <div className="flex flex-wrap items-center gap-1.5 sm:justify-end shrink-0">
+            
+            {/* For OPEN/QUEUED proposals */}
             {!isArchived && (
               <>
                 <button
                   onClick={() => handleVote(idea.id)}
                   disabled={votingId === idea.id}
-                  className={`text-xs px-3 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none ${
+                  className={`text-xs px-3.5 py-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer select-none active:scale-95 ${
                     userVoted 
-                      ? 'bg-[#63BDF2]/20 border border-[#63BDF2]/40 text-[#63BDF2] hover:bg-[#63BDF2]/30' 
+                      ? 'bg-[#63BDF2]/15 border border-[#63BDF2]/35 text-[#63BDF2] hover:bg-[#63BDF2]/25' 
                       : 'bg-white/5 border border-white/10 text-white hover:bg-white/10'
                   }`}
                 >
                   {votingId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <ThumbsUp size={12} className={userVoted ? 'fill-[#63BDF2]' : ''} />}
-                  <span>Agree</span>
+                  <span>{userVoted ? 'Agreed' : 'Agree'}</span>
                 </button>
 
                 {canManage(idea) && (
                   <>
-                    <button onClick={() => handleAction(idea.id, () => queueIdea(idea.id))} disabled={actionId === idea.id}
-                      className={`text-xs px-2.5 py-2 rounded-xl font-bold flex items-center gap-1 transition-all cursor-pointer select-none ${
-                        isQueued ? 'bg-purple-500/15 border border-purple-500/30 text-purple-400' : 'bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10'
-                      }`} title={isQueued ? 'Remove from Queue' : 'Add to Queue'}>
+                    <button 
+                      onClick={() => handleAction(idea.id, () => queueIdea(idea.id))} 
+                      disabled={actionId === idea.id}
+                      className={`text-xs p-2 rounded-xl font-bold flex items-center justify-center transition-all cursor-pointer select-none active:scale-95 ${
+                        isQueued 
+                          ? 'bg-purple-500/15 border border-purple-500/35 text-purple-400' 
+                          : 'bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10'
+                      }`} 
+                      title={isQueued ? 'Remove from Queue' : 'Add to Queue'}
+                    >
                       {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <ListOrdered size={12} />}
                     </button>
 
                     {/* Convert to Work — ONLY at 100% consensus */}
                     {approvalRate >= 100 ? (
-                      <button onClick={() => handleAction(idea.id, () => updateWorkStatus(idea.id, 'ACTIVE'))} disabled={actionId === idea.id}
-                        className="text-xs bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-400 px-3 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none animate-pulse hover:animate-none"
-                        title="All members agreed — Convert to Active Work">
+                      <button 
+                        onClick={() => handleAction(idea.id, () => updateWorkStatus(idea.id, 'ACTIVE'))} 
+                        disabled={actionId === idea.id}
+                        className="text-xs bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-400 px-3 py-2.5 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer select-none animate-pulse hover:animate-none active:scale-95"
+                        title="All members agreed — Convert to Active Work"
+                      >
                         {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <Play size={10} className="fill-emerald-400 text-emerald-400" />}
-                        <span>Convert to Work</span>
+                        <span>Convert</span>
                       </button>
                     ) : (
-                      <div className="text-[9px] text-zinc-600 bg-zinc-800/30 border border-zinc-700/20 px-2.5 py-2 rounded-xl font-bold flex items-center gap-1 select-none cursor-not-allowed" title={`Need ${membersCount - idea.supports.length} more agree to convert`}>
+                      <div 
+                        className="text-[9px] text-zinc-500 bg-zinc-900/40 border border-white/5 px-2.5 py-2 rounded-xl font-bold flex items-center gap-1 select-none cursor-not-allowed" 
+                        title={`Need ${membersCount - idea.supports.length} more agreements to convert`}
+                      >
                         <Play size={10} className="text-zinc-700" />
-                        <span>{approvalRate}% — Need all</span>
+                        <span>{approvalRate}%</span>
                       </div>
                     )}
-                    <button onClick={() => setDeclineModalId(idea.id)}
-                      className="text-xs bg-red-500/5 hover:bg-red-500/10 border border-red-500/15 text-red-400 px-2.5 py-2 rounded-xl font-bold flex items-center gap-1 transition-all cursor-pointer select-none"
-                      title="Decline Proposal">
+                    
+                    <button 
+                      onClick={() => setDeclineModalId(idea.id)}
+                      className="text-xs bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 text-red-400 p-2 rounded-xl font-bold flex items-center justify-center transition-all cursor-pointer select-none active:scale-95"
+                      title="Decline Proposal"
+                    >
                       <XCircle size={12} />
                     </button>
 
-                    <button onClick={() => handleAction(idea.id, () => shelveIdea(idea.id))}
-                      className="text-xs bg-zinc-500/5 hover:bg-zinc-500/10 border border-zinc-500/15 text-zinc-400 px-2.5 py-2 rounded-xl font-bold flex items-center gap-1 transition-all cursor-pointer select-none"
-                      title="Shelve for Later">
+                    <button 
+                      onClick={() => handleAction(idea.id, () => shelveIdea(idea.id))}
+                      className="text-xs bg-zinc-500/5 hover:bg-zinc-500/10 border border-zinc-500/10 text-zinc-400 p-2 rounded-xl font-bold flex items-center justify-center transition-all cursor-pointer select-none active:scale-95"
+                      title="Shelve for Later"
+                    >
                       <Archive size={12} />
                     </button>
+
+                    {/* Edit Details */}
+                    <button 
+                      onClick={() => {
+                        setEditingId(idea.id)
+                        setEditName(idea.name)
+                        setEditPriority(idea.priority)
+                        setEditDescription(idea.description)
+                      }}
+                      className="text-xs bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-400 hover:text-white p-2 rounded-xl font-bold flex items-center justify-center transition-all cursor-pointer select-none active:scale-95"
+                      title="Edit Details"
+                    >
+                      <Edit2 size={12} />
+                    </button>
+
+                    {/* Delete Proposal */}
+                    {deleteConfirmId === idea.id ? (
+                      <div className="flex items-center gap-1 bg-red-500/15 border border-red-500/35 rounded-xl p-0.5 animate-fadeIn">
+                        <button 
+                          onClick={() => handleDelete(idea.id)} 
+                          disabled={actionId === idea.id}
+                          className="text-[9px] bg-red-500 hover:bg-red-650 text-white px-2 py-0.5 rounded font-bold transition-all cursor-pointer"
+                        >
+                          {actionId === idea.id ? <Loader2 size={10} className="animate-spin" /> : 'Yes'}
+                        </button>
+                        <button 
+                          onClick={() => setDeleteConfirmId(null)}
+                          className="text-[9px] bg-white/5 hover:bg-white/10 text-zinc-400 px-2 py-0.5 rounded font-bold transition-all cursor-pointer"
+                        >
+                          No
+                        </button>
+                      </div>
+                    ) : (
+                      <button 
+                        onClick={() => setDeleteConfirmId(idea.id)}
+                        className="text-xs bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 text-red-400 p-2 rounded-xl font-bold flex items-center justify-center transition-all cursor-pointer select-none active:scale-95"
+                        title="Delete Proposal"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
                   </>
                 )}
               </>
             )}
 
-            {/* For DECLINED/SHELVED — Revive & Delete */}
-            {isArchived && canManage(idea) && (
+            {/* For DECLINED/SHELVED proposals */}
+            {isArchived && !isDeleted && (
               <>
-                <button onClick={() => handleAction(idea.id, () => reviveIdea(idea.id))} disabled={actionId === idea.id}
-                  className="text-xs bg-[#63BDF2]/10 hover:bg-[#63BDF2]/20 border border-[#63BDF2]/25 text-[#63BDF2] px-3 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none">
-                  {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
-                  <span>Revive</span>
-                </button>
-
-                {deleteConfirmId === idea.id ? (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-red-400 font-bold">Sure?</span>
-                    <button onClick={() => handleDelete(idea.id)} disabled={actionId === idea.id}
-                      className="text-[10px] bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 px-2 py-1 rounded-lg font-bold cursor-pointer select-none">
-                      {actionId === idea.id ? <Loader2 size={10} className="animate-spin" /> : 'Yes, Delete'}
-                    </button>
-                    <button onClick={() => setDeleteConfirmId(null)}
-                      className="text-[10px] bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-400 px-2 py-1 rounded-lg font-bold cursor-pointer select-none">
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <button onClick={() => setDeleteConfirmId(idea.id)}
-                    className="text-xs bg-red-500/5 hover:bg-red-500/10 border border-red-500/15 text-red-400/60 px-2.5 py-2 rounded-xl font-bold flex items-center gap-1 transition-all cursor-pointer select-none"
-                    title="Delete Permanently">
-                    <Trash2 size={12} />
+                {canManage(idea) && (
+                  <button 
+                    onClick={() => handleAction(idea.id, () => reviveIdea(idea.id))} 
+                    disabled={actionId === idea.id}
+                    className="text-xs bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 px-3.5 py-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer select-none active:scale-95"
+                  >
+                    {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                    <span>Revive</span>
                   </button>
                 )}
+
+                {canManage(idea) && (
+                  <div className="flex items-center gap-1.5">
+                    {deleteConfirmId === idea.id ? (
+                      <>
+                        <button 
+                          onClick={() => handleDelete(idea.id)} 
+                          disabled={actionId === idea.id}
+                          className="text-xs bg-red-500 text-white hover:bg-red-655 px-3 py-2 rounded-xl font-bold transition-all cursor-pointer"
+                        >
+                          {actionId === idea.id ? <Loader2 size={10} className="animate-spin" /> : 'Yes, Delete'}
+                        </button>
+                        <button 
+                          onClick={() => setDeleteConfirmId(null)}
+                          className="text-xs bg-white/5 hover:bg-white/10 text-zinc-400 px-2.5 py-2 rounded-xl font-bold transition-all cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button 
+                        onClick={() => setDeleteConfirmId(idea.id)}
+                        className="text-xs bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 text-red-400 p-2 rounded-xl font-bold flex items-center justify-center transition-all cursor-pointer select-none active:scale-95"
+                        title="Delete Permanently"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
+                  </div>
+                )}
               </>
+            )}
+
+            {/* For DELETED proposals */}
+            {isDeleted && canManage(idea) && (
+              <button 
+                onClick={() => handleAction(idea.id, () => reviveIdea(idea.id))} 
+                disabled={actionId === idea.id}
+                className="text-xs bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/25 text-emerald-400 px-4 py-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer select-none active:scale-95"
+              >
+                {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                <span>Restore Proposal</span>
+              </button>
             )}
           </div>
         </div>
 
-        {/* Support Progress Bar — only for non-archived */}
-        {!isArchived && (
-          <div className="pt-3 space-y-1.5 border-t border-white/5">
-            <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-white/95">Team Support:</span>
-                <span>{idea.supports.length} of {membersCount} agreed ({approvalRate}%)</span>
-              </div>
-              {approvalRate === 100 && (
-                <span className="text-emerald-400 font-bold flex items-center gap-1">
-                  <Check size={12} /> Full Consensus
-                </span>
-              )}
-            </div>
-            <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
-              <div className="bg-gradient-to-r from-[#63BDF2] to-blue-500 h-full rounded-full transition-all duration-300" style={{ width: `${Math.min(100, approvalRate)}%` }} />
-            </div>
-
-            {idea.supports.length > 0 && (
-              <div className="pt-2 space-y-1.5">
-                <span className="text-[9px] uppercase font-bold text-muted-foreground">Agreement Timeline:</span>
-                <div className="flex flex-wrap gap-2">
-                  {idea.supports.map(v => (
-                    <div key={v.userId} className="flex items-center gap-1.5 bg-white/5 border border-white/5 rounded-lg px-2 py-1">
-                      {v.user.profilePhoto ? (
-                        <img src={v.user.profilePhoto} alt={v.user.name} className="w-4 h-4 rounded-full object-cover" />
-                      ) : (
-                        <div className="w-4 h-4 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-[7px] uppercase">{v.user.name.charAt(0)}</div>
-                      )}
-                      <span className="text-[10px] font-bold text-zinc-300">{v.user.name}</span>
-                      <span className="text-[9px] text-zinc-600" suppressHydrationWarning>• {formatRelativeTime(v.createdAt)}</span>
-                    </div>
-                  ))}
+        {/* Agreement Support List */}
+        {!isArchived && idea.supports.length > 0 && (
+          <div className="pt-2 space-y-1.5 border-t border-white/5">
+            <span className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider">Agreement Timeline:</span>
+            <div className="flex flex-wrap gap-1.5">
+              {idea.supports.map(v => (
+                <div key={v.userId} className="flex items-center gap-1.5 bg-white/5 border border-white/5 rounded-lg px-2 py-1">
+                  {v.user.profilePhoto ? (
+                    <img src={v.user.profilePhoto} alt={v.user.name} className="w-3.5 h-3.5 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-3.5 h-3.5 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-[6px] uppercase">{v.user.name.charAt(0)}</div>
+                  )}
+                  <span className="text-[10px] font-bold text-zinc-300">{v.user.name}</span>
+                  <span className="text-[9px] text-zinc-550" suppressHydrationWarning>• {formatRelativeTime(v.createdAt)}</span>
                 </div>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Activity Log */}
+        {/* Activity Log Audit Timeline */}
         {idea.activityLogs && idea.activityLogs.length > 0 && (
           <div className="border-t border-white/5 pt-3">
             <button onClick={() => setExpandedId(isExpanded ? null : idea.id)}
@@ -414,7 +631,7 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                               <div className="w-3.5 h-3.5 rounded-full bg-zinc-700 text-zinc-400 flex items-center justify-center text-[6px] font-bold uppercase">{log.user?.name?.charAt(0) || '?'}</div>
                             )}
                             <span className="text-[10px] font-bold text-zinc-400">{log.user?.name || 'System'}</span>
-                            <span className="text-[9px] text-zinc-600" suppressHydrationWarning>• {formatDateTime(log.createdAt)}</span>
+                            <span className="text-[9px] text-zinc-550" suppressHydrationWarning>• {formatDateTime(log.createdAt)}</span>
                           </div>
                           <p className="text-[10px] text-zinc-500 leading-relaxed pl-5">{log.details || log.action}</p>
                         </div>
@@ -436,15 +653,22 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     { key: 'queued' as const, label: 'Queue', icon: <ListOrdered size={12} />, count: queuedIdeas.length, color: '' },
     { key: 'declined' as const, label: 'Declined', icon: <XCircle size={12} />, count: declinedIdeas.length, color: '' },
     { key: 'shelved' as const, label: 'Shelved', icon: <Archive size={12} />, count: shelvedIdeas.length, color: '' },
+    { key: 'deleted' as const, label: 'Deleted', icon: <Trash2 size={12} />, count: deletedIdeas.length, color: '' },
   ]
 
-  const currentList = activeTab === 'open' ? openIdeas : activeTab === 'queued' ? queuedIdeas : activeTab === 'declined' ? declinedIdeas : shelvedIdeas
+  const currentList = 
+    activeTab === 'open' ? openIdeas : 
+    activeTab === 'queued' ? queuedIdeas : 
+    activeTab === 'declined' ? declinedIdeas : 
+    activeTab === 'shelved' ? shelvedIdeas : 
+    deletedIdeas
   
   const emptyMessages: Record<string, string> = {
     open: 'No open proposals right now. Click "New Proposal" to share your idea!',
     queued: 'No ideas in execution queue. Move ideas here when the team agrees.',
     declined: 'No declined proposals. Ideas that don\'t pass team review appear here with reasons.',
     shelved: 'No shelved proposals. Ideas saved for future reconsideration appear here.',
+    deleted: 'No deleted proposals. Deleted ideas appear here with their complete history.',
   }
 
   const bannerMessages: Record<string, { icon: React.ReactNode; color: string; text: string } | null> = {
@@ -452,12 +676,13 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     queued: { icon: <ArrowRightCircle size={14} className="shrink-0 mt-0.5 text-purple-400" />, color: 'bg-purple-500/5 border-purple-500/10 text-purple-300/80', text: 'Execution Queue — Ideas approved by the team, waiting to start as Active Work. Admin or creator can click the play button to begin.' },
     declined: { icon: <AlertTriangle size={14} className="shrink-0 mt-0.5 text-red-400" />, color: 'bg-red-500/5 border-red-500/10 text-red-300/70', text: 'Declined Archive — These proposals were reviewed but not approved. Each has a documented reason. They can be revived if the situation changes, or permanently deleted.' },
     shelved: { icon: <Pause size={14} className="shrink-0 mt-0.5 text-zinc-400" />, color: 'bg-zinc-500/5 border-zinc-500/10 text-zinc-300/70', text: 'Shelved Ideas — Not rejected, just paused. These might be reconsidered in the future when timing or resources are better. Revive anytime.' },
+    deleted: { icon: <Trash2 size={14} className="shrink-0 mt-0.5 text-zinc-500" />, color: 'bg-zinc-500/5 border-zinc-500/10 text-zinc-300/70', text: 'Deleted Archives — Proposals deleted by their creator or an admin. Full history, dates, and agreement timelines are preserved for audit purposes.' },
   }
 
   return (
-    <div className="bg-secondary/20 border border-border rounded-3xl p-6 md:p-8 space-y-6">
+    <div className="bg-secondary/15 border border-border/30 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 space-y-6">
       {/* Title Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border/30">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/30">
         <div className="flex items-center gap-2 min-w-0">
           <Lightbulb className="text-yellow-400 shrink-0" size={20} />
           <h2 className="text-base sm:text-lg font-bold text-white tracking-tight truncate">Proposals & Ideas</h2>
@@ -466,9 +691,11 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
             content="IDEA → Team votes Agree → QUEUED (ready for work) → ACTIVE (started). If team doesn't agree, ideas can be DECLINED (with reason) or SHELVED (maybe later). Declined/Shelved ideas can be REVIVED or permanently DELETED. Every action is timestamped with full audit trail."
           />
         </div>
-        <button onClick={() => setShowAddForm(!showAddForm)}
-          className="text-xs bg-white text-black hover:bg-white/90 px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none shrink-0 w-full sm:w-auto justify-center">
-          <Plus size={14} /> New Proposal
+        <button 
+          onClick={() => setShowAddForm(!showAddForm)}
+          className="text-xs bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-500 hover:to-amber-600 text-black px-4 py-2.5 rounded-xl font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer select-none shrink-0 w-full sm:w-auto shadow-md shadow-yellow-500/10 active:scale-95 border-0"
+        >
+          <Plus size={14} className="stroke-[3]" /> New Proposal
         </button>
       </div>
 
@@ -476,17 +703,17 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
       <AnimatePresence>
         {showAddForm && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-            <form onSubmit={handleAddIdea} className="bg-[#09090b]/30 border border-white/5 p-4 rounded-2xl space-y-3">
-              <h3 className="text-xs font-bold text-white uppercase">Submit New Proposal</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase text-muted-foreground font-bold">Proposal Title</label>
+            <form onSubmit={handleAddIdea} className="bg-zinc-950/40 border border-white/5 p-4 sm:p-5 rounded-2xl space-y-4">
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider">Submit New Proposal</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase text-zinc-500 font-bold">Proposal Title</label>
                   <input type="text" name="name" required placeholder="e.g., Weekly Team Meetup or Client Dashboard Redesign"
-                    className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary/50" />
+                    className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-yellow-500/50" />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase text-muted-foreground font-bold">Priority</label>
-                  <select name="priority" className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary/50">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase text-zinc-500 font-bold">Priority</label>
+                  <select name="priority" className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-yellow-500/50">
                     <option value="LOW">LOW</option>
                     <option value="MEDIUM">MEDIUM</option>
                     <option value="HIGH">HIGH</option>
@@ -494,14 +721,14 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                   </select>
                 </div>
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] uppercase text-muted-foreground font-bold">Details / Explanation</label>
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase text-zinc-500 font-bold">Details / Explanation</label>
                 <textarea name="description" required rows={3} placeholder="Explain the idea, benefits, or workflow in detail..."
-                  className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 resize-none" />
+                  className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-yellow-500/50 resize-none" />
               </div>
               <div className="flex justify-end gap-2 pt-1">
-                <button type="button" onClick={() => setShowAddForm(false)} className="text-xs bg-white/5 hover:bg-white/10 px-3 py-2 rounded-xl text-muted-foreground hover:text-white cursor-pointer font-bold">Cancel</button>
-                <button type="submit" disabled={isSubmitting} className="text-xs bg-primary text-black hover:bg-primary/90 px-4 py-2 rounded-xl font-bold disabled:opacity-50 cursor-pointer flex items-center gap-1.5">
+                <button type="button" onClick={() => setShowAddForm(false)} className="text-xs bg-white/5 hover:bg-white/10 px-3.5 py-2 rounded-xl text-zinc-400 hover:text-white cursor-pointer font-bold">Cancel</button>
+                <button type="submit" disabled={isSubmitting} className="text-xs bg-yellow-500 text-black hover:bg-yellow-450 px-4 py-2 rounded-xl font-bold disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-md shadow-yellow-500/5">
                   {isSubmitting ? <Loader2 size={12} className="animate-spin" /> : 'Submit Proposal'}
                 </button>
               </div>
@@ -510,17 +737,23 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
         )}
       </AnimatePresence>
 
-      {/* 4-Tab Navigation */}
-      <div className="overflow-x-auto -mx-1 px-1 scrollbar-none">
-        <div className="flex bg-[#0c0d12]/60 p-1 rounded-xl border border-white/10 w-fit select-none gap-0.5">
-        {tabs.map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === tab.key ? 'bg-white text-black' : 'text-muted-foreground hover:text-white'
-            }`}>
-            {tab.icon} <span className="hidden min-[400px]:inline">{tab.label}</span> ({tab.count})
-          </button>
-        ))}
+      {/* 5-Tab Navigation Bar */}
+      <div className="w-full relative">
+        <div className="overflow-x-auto scrollbar-none -mx-4 px-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0">
+          <div className="flex bg-zinc-950/60 p-1 rounded-2xl border border-white/5 select-none gap-1 w-max min-w-full md:w-full md:grid md:grid-cols-5">
+          {tabs.map(tab => (
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+              className={`flex-1 flex-shrink-0 px-3 py-2.5 sm:px-4 sm:py-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 whitespace-nowrap ${
+                activeTab === tab.key 
+                  ? 'bg-gradient-to-br from-white to-zinc-200 text-black shadow-lg shadow-white/5 font-black' 
+                  : 'text-zinc-400 hover:text-white hover:bg-white/5'
+              }`}>
+              <span className="shrink-0">{tab.icon}</span>
+              <span>{tab.label}</span>
+              <span className="text-[10px] opacity-60 font-mono">({tab.count})</span>
+            </button>
+          ))}
+          </div>
         </div>
       </div>
 

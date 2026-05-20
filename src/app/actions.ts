@@ -85,6 +85,21 @@ export async function editWork(id: string, formData: FormData) {
     const isAuthorized = user.role === 'ADMIN' || work.creatorId === user.id
     if (!isAuthorized) return { success: false, error: 'Not authorized to edit' }
 
+    // Compare fields to track detailed changes
+    const changes: string[] = []
+    if (work.name !== name) {
+      changes.push(`Title changed from "${work.name}" to "${name}"`)
+    }
+    if (work.priority !== priority) {
+      changes.push(`Priority changed from "${work.priority}" to "${priority}"`)
+    }
+    if (work.description !== description) {
+      changes.push(`Description updated`)
+    }
+    const logMsg = changes.length > 0 
+      ? `Edited details: ${changes.join(', ')}` 
+      : `Edited details of work: "${name}"`
+
     await prisma.work.update({
       where: { id },
       data: {
@@ -100,7 +115,7 @@ export async function editWork(id: string, formData: FormData) {
       }
     })
 
-    await logActivity('UPDATED_WORK', user.id, id, `Edited details of work: "${name}"`)
+    await logActivity('UPDATED_WORK', user.id, id, logMsg)
     
     revalidatePath('/')
     revalidatePath('/works')
@@ -309,7 +324,7 @@ export async function getIdeasWithSupports() {
   try {
     const data = await prisma.work.findMany({
       where: {
-        status: { in: ['IDEA', 'QUEUED', 'DECLINED', 'SHELVED'] }
+        status: { in: ['IDEA', 'QUEUED', 'DECLINED', 'SHELVED', 'DELETED'] }
       },
       include: {
         creator: { select: { id: true, name: true, profilePhoto: true, role: true } },
@@ -524,34 +539,31 @@ export async function deleteIdea(workId: string) {
 
   try {
     const work = await prisma.work.findUnique({
-      where: { id: workId },
-      include: { supports: true }
+      where: { id: workId }
     })
     if (!work) return { success: false, error: 'Work not found' }
 
-    // Only creator can delete, and only if no one has voted yet
+    // Only creator or admin can delete
     if (work.creatorId !== user.id && user.role !== 'ADMIN') {
       return { success: false, error: 'Only the proposal creator or admin can delete' }
     }
-    if (work.supports.length > 0 && user.role !== 'ADMIN') {
-      return { success: false, error: 'Cannot delete — team members have already voted. Decline or shelve it instead.' }
-    }
 
-    // Delete relations first, then work
-    await prisma.ideaSupport.deleteMany({ where: { workId } })
-    await prisma.activityLog.deleteMany({ where: { workId } })
-    await prisma.workUpdate.deleteMany({ where: { workId } })
-    await prisma.work.delete({ where: { id: workId } })
+    // Soft delete: set status to 'DELETED'
+    await prisma.work.update({
+      where: { id: workId },
+      data: { status: 'DELETED' }
+    })
 
     await logActivity(
       'DELETED_IDEA',
       user.id,
-      undefined,
-      `Permanently deleted proposal "${work.name}"`
+      workId,
+      `Deleted proposal "${work.name}" — moved to deleted archives`
     )
 
     revalidatePath('/')
     revalidatePath('/works')
+    revalidatePath('/proposals')
     return { success: true }
   } catch (error: any) {
     console.error('Failed to delete idea:', error)

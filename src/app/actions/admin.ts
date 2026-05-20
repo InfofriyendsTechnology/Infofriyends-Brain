@@ -98,14 +98,13 @@ export async function getMembers() {
   }
 }
 
-export async function updateMember(id: string, name: string, email: string, username: string, role: 'ADMIN' | 'MEMBER', score: number, password?: string) {
+export async function updateMember(id: string, name: string, email: string, username: string, role: 'ADMIN' | 'MEMBER', password?: string) {
   try {
     const updateData: any = {
       name,
       email,
       username,
-      role,
-      contributionScore: score
+      role
     }
 
     if (password && password.trim() !== '') {

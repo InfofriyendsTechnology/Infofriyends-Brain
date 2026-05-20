@@ -99,7 +99,6 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
     { value: 'BLOCKED', label: 'Blocked' },
     { value: 'COMPLETED', label: 'Completed' },
     { value: 'ARCHIVED', label: 'Archived' },
-    { value: 'DELETED', label: 'Deleted' },
   ]
 
   const priorityOptions = [
@@ -127,8 +126,8 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
     loadMembers()
   }, [])
 
-  // Only show Workspace statuses (exclude Proposals)
-  const workspaceWorks = works.filter(w => !['IDEA', 'QUEUED', 'DECLINED', 'SHELVED'].includes(w.status))
+  // Only show Workspace statuses (exclude Proposals & Deleted)
+  const workspaceWorks = works.filter(w => !['IDEA', 'QUEUED', 'DECLINED', 'SHELVED', 'DELETED'].includes(w.status))
 
   // Filter logic: Scope selection (Global Wall vs My Daily Focus)
   const scopedWorks = workspaceWorks.filter(w => {
@@ -176,10 +175,14 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
     }
   }
 
-  // Count metrics for quick HUD display
-  const blockedCount = works.filter(w => w.status === 'BLOCKED').length
+  // Count metrics for quick HUD display (synchronized with actual workspace works)
+  const blockedCount = workspaceWorks.filter(w => w.status === 'BLOCKED').length
   const myWorkCount = currentUser 
-    ? works.filter(w => w.assigneeId === currentUser.id).length 
+    ? workspaceWorks.filter(w => {
+        const isAssignedToMe = w.assigneeId === currentUser.id
+        const isCreatedByMeAndUnresolved = w.creatorId === currentUser.id && ['BLOCKED', 'ACTIVE'].includes(w.status)
+        return isAssignedToMe || isCreatedByMeAndUnresolved
+      }).length 
     : 0
 
   return (
@@ -371,7 +374,7 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
                       <th className="px-6 py-4">Team Assignees</th>
                       <th className="px-6 py-4 text-center">Priority</th>
                       <th className="px-6 py-4 text-center">Status</th>
-                      <th className="px-6 py-4 text-right">Sprint Value</th>
+                      <th className="px-6 py-4 text-center">Reviews & Rating</th>
                       <th className="px-6 py-4 text-right">Interactive Actions</th>
                     </tr>
                   </thead>
@@ -461,9 +464,24 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
                             </span>
                           </td>
 
-                          {/* Sprint points */}
-                          <td className="px-6 py-4 text-right font-bold text-[#63BDF2] font-mono">
-                            +{work.points || 10} PTS
+                          {/* Reviews & Rating column */}
+                          <td className="px-6 py-4 text-center">
+                            {work.reviews && work.reviews.length > 0 ? (
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className="text-yellow-400 font-black text-xs flex items-center justify-center gap-0.5">
+                                  ★ {(work.reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / work.reviews.length).toFixed(1)}
+                                </span>
+                                <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">
+                                  ({work.reviews.length} {work.reviews.length === 1 ? 'Review' : 'Reviews'})
+                                </span>
+                              </div>
+                            ) : (
+                              ['COMPLETED', 'ARCHIVED'].includes(work.status) ? (
+                                <span className="text-[10px] text-zinc-500/80 font-bold uppercase tracking-wider italic animate-pulse">Zero Reviews</span>
+                              ) : (
+                                <span className="text-[10px] text-zinc-650 italic" title="Reviews open after completion">—</span>
+                              )
+                            )}
                           </td>
 
                           {/* Interactive Row Actions */}

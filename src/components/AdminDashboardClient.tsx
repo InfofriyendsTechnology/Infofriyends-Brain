@@ -89,12 +89,11 @@ export default function AdminDashboardClient({ initialMembers }: { initialMember
     const email = formData.get('email') as string
     const username = formData.get('username') as string
     const role = formData.get('role') as 'ADMIN' | 'MEMBER'
-    const score = parseInt(formData.get('contributionScore') as string) || 0
     const password = formData.get('password') as string
 
     try {
-      await updateMember(editingMember.id, name, email, username, role, score, password)
-      setMembers(members.map(m => m.id === editingMember.id ? { ...m, name, email, username, role, contributionScore: score } : m))
+      await updateMember(editingMember.id, name, email, username, role, password)
+      setMembers(members.map(m => m.id === editingMember.id ? { ...m, name, email, username, role } : m))
       setEditingMember(null)
     } catch (err: any) {
       setEditError(err.message || 'Failed to update member')
@@ -166,7 +165,7 @@ export default function AdminDashboardClient({ initialMembers }: { initialMember
                   <th className="px-6 py-4">Name</th>
                   <th className="px-6 py-4">Username / Email</th>
                   <th className="px-6 py-4">Role</th>
-                  <th className="px-6 py-4 text-center">Score</th>
+                  <th className="px-6 py-4 text-center">Rating & Completed</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
@@ -204,11 +203,16 @@ export default function AdminDashboardClient({ initialMembers }: { initialMember
                       </span>
                     </td>
 
-                    {/* Contribution Score column */}
-                    <td className="px-6 py-4 text-center font-bold text-white text-sm">
-                      <div className="inline-flex items-center gap-1 bg-[#63BDF2]/5 border border-[#63BDF2]/15 px-2.5 py-1 rounded-lg">
-                        <Award size={12} className="text-[#63BDF2]" />
-                        <span>{member.contributionScore}</span>
+                    {/* Rating & Completed column */}
+                    <td className="px-6 py-4 text-center text-white text-xs">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <div className="inline-flex items-center gap-1 bg-[#63BDF2]/5 border border-[#63BDF2]/15 px-2.5 py-1 rounded-lg font-bold">
+                          <Award size={12} className="text-[#63BDF2]" />
+                          <span>{member.completedWorksCount || 0} Works</span>
+                        </div>
+                        {member.completedWorksCount > 0 && (
+                          <span className="text-[10px] text-zinc-400 font-semibold">★ {(member.averageRating || 0).toFixed(1)} Avg</span>
+                        )}
                       </div>
                     </td>
 
@@ -295,9 +299,12 @@ export default function AdminDashboardClient({ initialMembers }: { initialMember
               </div>
               
               <div className="flex items-center justify-between">
-                <div className="inline-flex items-center gap-1 bg-[#63BDF2]/5 border border-[#63BDF2]/15 px-2.5 py-1 rounded-lg text-xs font-bold text-white">
+                <div className="inline-flex items-center gap-1.5 bg-[#63BDF2]/5 border border-[#63BDF2]/15 px-2.5 py-1 rounded-lg text-xs font-bold text-white">
                   <Award size={12} className="text-[#63BDF2]" />
-                  <span>{member.contributionScore} PTS</span>
+                  <span>
+                    {member.completedWorksCount || 0} Works
+                    {member.completedWorksCount > 0 && ` (★ ${(member.averageRating || 0).toFixed(1)})`}
+                  </span>
                 </div>
                 
                 <div className="flex items-center gap-2">
@@ -524,16 +531,6 @@ export default function AdminDashboardClient({ initialMembers }: { initialMember
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-white/60 uppercase tracking-wider">Contribution Points</label>
-                  <input
-                    name="contributionScore"
-                    type="number"
-                    required
-                    defaultValue={editingMember.contributionScore}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-[#63BDF2]"
-                  />
-                </div>
 
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-white/60 uppercase tracking-wider">Reset Password (Optional)</label>
@@ -743,7 +740,6 @@ export default function AdminDashboardClient({ initialMembers }: { initialMember
                             <tr className="bg-secondary/40 text-muted-foreground border-b border-white/5 text-[9px] font-bold uppercase tracking-wider">
                               <th className="px-4 py-3">Work Request</th>
                               <th className="px-4 py-3 text-center">Status</th>
-                              <th className="px-4 py-3 text-right">Value</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-white/5">
@@ -760,12 +756,11 @@ export default function AdminDashboardClient({ initialMembers }: { initialMember
                                     {w.status}
                                   </span>
                                 </td>
-                                <td className="px-4 py-3 text-right font-bold text-[#63BDF2] font-mono">+{w.points || 10} PTS</td>
                               </tr>
                             ))}
                             {works.length === 0 && (
                               <tr>
-                                <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
+                                <td colSpan={2} className="px-4 py-8 text-center text-muted-foreground">
                                   This member has not logged any work requests yet.
                                 </td>
                               </tr>

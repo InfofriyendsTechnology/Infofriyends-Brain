@@ -33,10 +33,12 @@ function ProposalsSkeleton() {
         <div className="h-6 w-56 bg-white/5 rounded-lg" />
         <div className="h-9 w-32 bg-white/5 rounded-xl" />
       </div>
-      <div className="flex gap-1.5">
-        {[1, 2, 3, 4].map(i => (
-          <div key={i} className="h-8 w-24 bg-white/5 rounded-xl" />
-        ))}
+      <div className="overflow-x-auto scrollbar-none -mx-4 px-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0">
+        <div className="flex bg-zinc-950/60 p-1 rounded-2xl border border-white/5 gap-1.5 w-max min-w-full md:w-full md:grid md:grid-cols-5">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="flex-1 flex-shrink-0 h-9 sm:h-11 bg-white/5 rounded-xl" />
+          ))}
+        </div>
       </div>
       <div className="space-y-4">
         {[1, 2, 3].map(i => (
@@ -83,7 +85,7 @@ export default async function ProposalsPage() {
               { label: 'Start Work', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
             ].map((step, i) => (
               step.label === '→' ? (
-                <span key={i} className={`text-sm font-bold ${step.color}`}>{step.label}</span>
+                <span key={i} className={`text-sm font-bold hidden sm:inline-block ${step.color}`}>{step.label}</span>
               ) : (
                 <span key={i} className={`text-[10px] px-2.5 py-1 rounded-lg border font-bold uppercase tracking-wider ${step.color}`}>
                   {step.label}
