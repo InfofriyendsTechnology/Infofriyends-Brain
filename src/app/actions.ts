@@ -228,3 +228,62 @@ export async function getCommunityPosts() {
   }
 }
 
+// Idea & Proposal Agreement Actions
+export async function getIdeasWithSupports() {
+  try {
+    const data = await prisma.work.findMany({
+      where: {
+        status: 'IDEA'
+      },
+      include: {
+        creator: { select: { id: true, name: true, profilePhoto: true, role: true } },
+        supports: {
+          include: {
+            user: { select: { id: true, name: true, profilePhoto: true, role: true } }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+    return JSON.parse(JSON.stringify(data))
+  } catch (error) {
+    console.error('Failed to get ideas with supports:', error)
+    return []
+  }
+}
+
+export async function toggleIdeaSupport(workId: string) {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Unauthorized' }
+  const userId = session.user.id
+
+  try {
+    const existing = await prisma.ideaSupport.findUnique({
+      where: {
+        workId_userId: { workId, userId }
+      }
+    })
+
+    if (existing) {
+      await prisma.ideaSupport.delete({
+        where: {
+          workId_userId: { workId, userId }
+        }
+      })
+      await logActivity('REMOVE_IDEA_SUPPORT', userId, workId, `Removed agreement/support for Idea: ${workId}`)
+    } else {
+      await prisma.ideaSupport.create({
+        data: { workId, userId }
+      })
+      await logActivity('ADD_IDEA_SUPPORT', userId, workId, `Voted AGREE/SUPPORT for Idea: ${workId}`)
+    }
+
+    revalidatePath('/')
+    revalidatePath('/works')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to toggle idea support:', error)
+    return { success: false, error: `Database error: ${error.message || error}` }
+  }
+}
+

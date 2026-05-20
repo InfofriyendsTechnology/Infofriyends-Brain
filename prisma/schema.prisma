@@ -42,6 +42,7 @@ model User {
   dailyUpdates      DailyUpdate[]
   chatMessages      ChatMessage[]
   typingStates      TypingState[]
+  ideaSupports      IdeaSupport[]
 }
 
 model Work {
@@ -69,6 +70,8 @@ model Work {
   editedByAdminId String?
   editedByAdmin   User?    @relation("WorkEditor", fields: [editedByAdminId], references: [id])
   editReason      String?  @db.Text
+
+  supports        IdeaSupport[]
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -149,4 +152,15 @@ model WorkUpdate {
   workId    String
   work      Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+}
+
+model IdeaSupport {
+  id        String   @id @default(cuid())
+  workId    String
+  work      Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([workId, userId])
 }

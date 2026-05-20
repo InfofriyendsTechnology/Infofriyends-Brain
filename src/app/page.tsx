@@ -1,11 +1,12 @@
-import { getWorks, getCommunityPosts } from '@/app/actions'
+import { getWorks, getCommunityPosts, getIdeasWithSupports } from '@/app/actions'
 import { getMembers } from '@/app/actions/admin'
 import { getSession } from '@/lib/auth'
-import TodayChanged from '@/components/TodayChanged'
 import AddWorkModal from '@/components/AddWorkModal'
 import MemberLeaderboard from '@/components/MemberLeaderboard'
 import DashboardMetrics from '@/components/DashboardMetrics'
 import WorkCard from '@/components/WorkCard'
+import IdeaAgreementHub from '@/components/IdeaAgreementHub'
+import SectionGuide from '@/components/SectionGuide'
 import { Terminal, ArrowRight, FolderGit2 } from 'lucide-react'
 import Link from 'next/link'
 import { Suspense } from 'react'
@@ -152,34 +153,89 @@ function LeaderboardSkeleton() {
   )
 }
 
-// --- 4. TODAY CHANGED STREAMING SECTION ---
-async function TodayChangedSection({ currentUser }: { currentUser: any }) {
-  let posts: any[] = []
+// --- 4. IDEA AGREEMENT STREAMING SECTION ---
+async function IdeaAgreementSection({ currentUser }: { currentUser: any }) {
+  let ideas: any[] = []
+  let membersCount = 0
   try {
-    posts = await getCommunityPosts()
+    ideas = await getIdeasWithSupports()
+    const members = await getMembers()
+    membersCount = members.length
   } catch (e) {}
 
-  return <TodayChanged posts={posts} currentUser={currentUser} />
+  return (
+    <IdeaAgreementHub 
+      ideas={ideas} 
+      currentUser={currentUser} 
+      membersCount={membersCount} 
+    />
+  )
 }
 
-function TodayChangedSkeleton() {
+function IdeaAgreementSkeleton() {
   return (
-    <div className="bg-[#0d0e12] border border-white/5 rounded-3xl p-6 md:p-8 space-y-8 select-none animate-pulse">
-      <div className="space-y-2">
+    <div className="bg-[#0d0e12] border border-white/5 rounded-3xl p-6 md:p-8 space-y-6 animate-pulse select-none">
+      <div className="flex justify-between items-center pb-4 border-b border-white/5">
         <div className="h-6 w-48 bg-white/5 rounded-lg" />
-        <div className="h-3.5 w-full bg-white/5 rounded" />
+        <div className="h-8 w-24 bg-white/5 rounded-xl" />
       </div>
       <div className="space-y-4">
-        <div className="space-y-2">
-          <div className="h-4 w-20 bg-white/5 rounded" />
-          <div className="grid grid-cols-2 gap-2">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-9 bg-white/5 rounded-xl" />
-            ))}
-          </div>
+        {[1, 2].map(i => (
+          <div key={i} className="h-28 bg-white/5 rounded-2xl" />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function WorkspaceGuideCard() {
+  return (
+    <div className="bg-secondary/20 border border-[#63BDF2]/10 rounded-3xl p-6 space-y-5 backdrop-blur-xl relative overflow-hidden group">
+      {/* Decorative glow */}
+      <div className="absolute -top-10 -right-10 w-24 h-24 bg-[#63BDF2]/10 rounded-full blur-2xl group-hover:bg-[#63BDF2]/15 transition-all duration-300" />
+      
+      <div className="flex items-center gap-2 pb-3 border-b border-border/30">
+        <span className="text-lg">💡</span>
+        <h3 className="font-bold text-sm uppercase tracking-wider text-white">Workspace Guide</h3>
+      </div>
+      
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <h4 className="text-xs font-bold text-primary flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+            Global Workspace Wall
+          </h4>
+          <p className="text-[11px] text-zinc-400 leading-relaxed pl-3 font-medium">
+            Central repository tracking all feature requests. Members move items across Idea, Active, Blocked, and Completed columns.
+          </p>
         </div>
-        <div className="h-20 w-full bg-white/5 rounded-xl" />
-        <div className="h-11 w-full bg-white/5 rounded-xl" />
+        <div className="space-y-1">
+          <h4 className="text-xs font-bold text-orange-400 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
+            My Focus Area
+          </h4>
+          <p className="text-[11px] text-zinc-400 leading-relaxed pl-3 font-medium">
+            Your personalized sandbox. Automatically filters and highlights tasks explicitly assigned to your focus.
+          </p>
+        </div>
+        <div className="space-y-1">
+          <h4 className="text-xs font-bold text-[#63BDF2] flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#63BDF2]" />
+            Proposals & Ideas Board
+          </h4>
+          <p className="text-[11px] text-zinc-400 leading-relaxed pl-3 font-medium">
+            Company-wide idea sharing. Vote 'Agree' to show consensus on company proposals and decisions before starting action.
+          </p>
+        </div>
+        <div className="space-y-1">
+          <h4 className="text-xs font-bold text-yellow-400 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+            Founder Board
+          </h4>
+          <p className="text-[11px] text-zinc-400 leading-relaxed pl-3 font-medium">
+            Weekly team momentum tracker. Members earn developer points for task completion based on complexity.
+          </p>
+        </div>
       </div>
     </div>
   )
@@ -231,12 +287,18 @@ export default async function Home() {
       {/* Main SaaS Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left main section: Active Works Summary & Previews */}
+        {/* Left main section: Active Works & Ideas Hub */}
         <div className="lg:col-span-8 space-y-8">
+          {/* Active Projects Overview */}
           <div className="bg-secondary/10 border border-border/30 rounded-3xl p-6 backdrop-blur-xl space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border/30">
               <div className="flex items-center gap-2">
                 <FolderGit2 className="text-primary" size={20} />
                 <h2 className="text-lg font-bold text-white tracking-tight">Active Projects Overview</h2>
+                <SectionGuide 
+                  title="Active Projects"
+                  content="This grid showcases works that are currently in the ACTIVE development stage. Tap on a project to open its timeline checklist or record new activity updates."
+                />
               </div>
               <Link 
                 href="/works"
@@ -251,19 +313,22 @@ export default async function Home() {
               <ActiveProjectsSection currentUser={session?.user} />
             </Suspense>
           </div>
+
+          {/* Ideas Alignment & Consensus Hub */}
+          <Suspense fallback={<IdeaAgreementSkeleton />}>
+            <IdeaAgreementSection currentUser={session?.user} />
+          </Suspense>
         </div>
 
-        {/* Right sidebar section: Leaderboard & Community feed */}
+        {/* Right sidebar section: Leaderboard & Workspace Guide */}
         <div className="lg:col-span-4 space-y-8">
           {/* Leaderboard - Progressive Hydration */}
           <Suspense fallback={<LeaderboardSkeleton />}>
             <LeaderboardSection />
           </Suspense>
 
-          {/* Today Changed Feed - Progressive Hydration */}
-          <Suspense fallback={<TodayChangedSkeleton />}>
-            <TodayChangedSection currentUser={session?.user} />
-          </Suspense>
+          {/* Workspace Guide Card */}
+          <WorkspaceGuideCard />
         </div>
       </div>
     </div>

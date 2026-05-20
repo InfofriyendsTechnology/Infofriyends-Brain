@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { Trophy, Flame, Shield, User as UserIcon } from 'lucide-react'
+import SectionGuide from './SectionGuide'
 
 export default function MemberLeaderboard({ members }: { members: any[] }) {
   // Sort members by contributionScore descending
@@ -13,6 +14,10 @@ export default function MemberLeaderboard({ members }: { members: any[] }) {
         <div className="flex items-center gap-2">
           <Trophy className="text-amber-400" size={20} />
           <h2 className="text-lg font-bold text-white tracking-tight">Founder Board</h2>
+          <SectionGuide 
+            title="Founder Board"
+            content="Tracks developer points. Members earn Contribution Scores when tasks they created are completed. The score resets or grows dynamically as tasks finish."
+          />
         </div>
         <div className="flex items-center gap-1 text-[10px] text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full font-semibold uppercase">
           <Flame size={12} /> Active Streak

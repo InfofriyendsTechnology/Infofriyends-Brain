@@ -151,7 +151,7 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
         userName: up.user?.name || 'Unknown',
         content: up.content,
         date: new Date(up.createdAt),
-        timeStr: new Date(up.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+        timeStr: new Date(up.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })
       })
     })
   }
@@ -163,7 +163,7 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
         userName: log.user?.name || 'System',
         content: log.details || log.action,
         date: new Date(log.createdAt),
-        timeStr: new Date(log.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+        timeStr: new Date(log.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })
       })
     })
   }
