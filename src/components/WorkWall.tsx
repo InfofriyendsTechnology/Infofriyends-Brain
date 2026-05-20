@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Search, FolderGit2, SlidersHorizontal, Grid, List, CheckCircle2, 
@@ -25,8 +26,13 @@ function CustomDropdown({
   chevronColor?: string
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null)
   const activeOption = options.find(o => o.value === value) || options[0]
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleOpen = (e: React.MouseEvent<HTMLButtonElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -46,7 +52,7 @@ function CustomDropdown({
       position: 'fixed' as const,
       top: triggerRect.bottom + 6,
       left,
-      zIndex: 999,
+      zIndex: 9999,
     }
   }
 
@@ -65,11 +71,11 @@ function CustomDropdown({
       </button>
 
       <AnimatePresence>
-        {isOpen && triggerRect && (
+        {isOpen && triggerRect && mounted && createPortal(
           <>
-            {/* Full-screen click-away backdrop — z-[998] so below panel */}
+            {/* Full-screen click-away backdrop — z-[9998] so below panel */}
             <div
-              className="fixed inset-0 z-[998]"
+              className="fixed inset-0 z-[9998]"
               onClick={() => setIsOpen(false)}
             />
 
@@ -100,7 +106,8 @@ function CustomDropdown({
                 ))}
               </div>
             </motion.div>
-          </>
+          </>,
+          document.body
         )}
       </AnimatePresence>
     </div>
