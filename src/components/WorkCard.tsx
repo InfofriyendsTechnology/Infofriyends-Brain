@@ -15,7 +15,6 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
   const [isExpanded, setIsExpanded] = useState(false)
   const [showBlockInput, setShowBlockInput] = useState(false)
   const [blockReason, setBlockReason] = useState('')
-  const [pointsInput, setPointsInput] = useState(work.points || 10)
 
   // Edit State
   const [isEditing, setIsEditing] = useState(false)

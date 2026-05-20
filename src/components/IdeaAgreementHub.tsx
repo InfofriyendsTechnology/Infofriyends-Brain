@@ -15,7 +15,7 @@ interface Idea {
   name: string
   description: string
   priority: string
-  points: number
+  points?: number
   status: string
   blockedReason: string | null
   createdAt: string
