@@ -118,7 +118,7 @@ async function main() {
       status: 'ACTIVE',
       priority: 'HIGH',
       creatorId: member1.id,
-      assigneeId: member1.id,
+      assignees: { connect: [{ id: member1.id }] },
     }
   })
 
@@ -130,7 +130,7 @@ async function main() {
       status: 'COMPLETED',
       priority: 'MEDIUM',
       creatorId: member2.id,
-      assigneeId: member2.id,
+      assignees: { connect: [{ id: member2.id }] },
     }
   })
 
@@ -142,7 +142,7 @@ async function main() {
       status: 'ACTIVE',
       priority: 'URGENT',
       creatorId: member1.id,
-      assigneeId: member1.id,
+      assignees: { connect: [{ id: member1.id }] },
     }
   })
 
@@ -154,7 +154,7 @@ async function main() {
       status: 'ACTIVE',
       priority: 'HIGH',
       creatorId: member2.id,
-      assigneeId: member2.id,
+      assignees: { connect: [{ id: member2.id }] },
     }
   })
 
@@ -166,7 +166,7 @@ async function main() {
       status: 'COMPLETED',
       priority: 'LOW',
       creatorId: adminUser.id,
-      assigneeId: member1.id,
+      assignees: { connect: [{ id: member1.id }] },
     }
   })
 
