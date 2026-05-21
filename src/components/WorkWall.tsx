@@ -134,7 +134,7 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
     if (activeScope === 'focus') {
       if (!currentUser) return false
       // My focus area shows works assigned to me OR blocked/active works I created
-      const isAssignedToMe = w.assigneeId === currentUser.id
+      const isAssignedToMe = w.assignees?.some((a: any) => a.id === currentUser.id)
       const isCreatedByMeAndUnresolved = w.creatorId === currentUser.id && ['BLOCKED', 'ACTIVE'].includes(w.status)
       return isAssignedToMe || isCreatedByMeAndUnresolved
     }
@@ -152,14 +152,14 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
     // Member
     const matchesMember = memberFilter === 'ALL' 
       ? true 
-      : (w.assigneeId === memberFilter || w.creatorId === memberFilter)
+      : (w.assignees?.some((a: any) => a.id === memberFilter) || w.creatorId === memberFilter)
 
     // Search Keyword
     const matchesSearch = 
       w.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       w.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (w.creator?.name && w.creator.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (w.assignee?.name && w.assignee.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      (w.assignees?.some((a: any) => a.name.toLowerCase().includes(searchTerm.toLowerCase())))
 
     return matchesStatus && matchesPriority && matchesMember && matchesSearch
   })
@@ -179,7 +179,7 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
   const blockedCount = workspaceWorks.filter(w => w.status === 'BLOCKED').length
   const myWorkCount = currentUser 
     ? workspaceWorks.filter(w => {
-        const isAssignedToMe = w.assigneeId === currentUser.id
+        const isAssignedToMe = w.assignees?.some((a: any) => a.id === currentUser.id)
         const isCreatedByMeAndUnresolved = w.creatorId === currentUser.id && ['BLOCKED', 'ACTIVE'].includes(w.status)
         return isAssignedToMe || isCreatedByMeAndUnresolved
       }).length 
@@ -385,7 +385,7 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
                       const isRowBlocked = work.status === 'BLOCKED'
 
                       // User permissions check
-                      const isRowCreatorOrAssignee = currentUser && (work.creatorId === currentUser.id || work.assigneeId === currentUser.id)
+                      const isRowCreatorOrAssignee = currentUser && (work.creatorId === currentUser.id || work.assignees?.some((a: any) => a.id === currentUser.id))
                       const isAuthorizedRow = currentUser?.role === 'ADMIN' || isRowCreatorOrAssignee
 
                       return (
@@ -420,18 +420,21 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
                               </div>
 
                               <div className="flex items-center gap-1.5">
-                                <span className="text-[9px] text-muted-foreground w-11 uppercase">Assignee:</span>
-                                {work.assignee ? (
-                                  <>
-                                    {work.assignee.profilePhoto ? (
-                                      <img src={work.assignee.profilePhoto} alt={work.assignee.name} className="w-4 h-4 rounded-full object-cover" />
-                                    ) : (
-                                      <div className="w-4 h-4 rounded-full bg-[#63BDF2]/20 text-[#63BDF2] flex items-center justify-center font-bold text-[8px]">
-                                        {work.assignee.name.charAt(0)}
+                                <span className="text-[9px] text-muted-foreground w-11 uppercase">Assignees:</span>
+                                {work.assignees && work.assignees.length > 0 ? (
+                                  <div className="flex -space-x-1.5 overflow-hidden">
+                                    {work.assignees.map((assignee: any) => (
+                                      <div key={assignee.id} className="relative z-10" title={assignee.name}>
+                                        {assignee.profilePhoto ? (
+                                          <img src={assignee.profilePhoto} alt={assignee.name} className="w-4 h-4 rounded-full object-cover border border-[#0d0e12]" />
+                                        ) : (
+                                          <div className="w-4 h-4 rounded-full bg-[#63BDF2]/20 text-[#63BDF2] flex items-center justify-center font-bold text-[8px] uppercase border border-[#0d0e12]">
+                                            {assignee.name.charAt(0)}
+                                          </div>
+                                        )}
                                       </div>
-                                    )}
-                                    <span className="text-white font-medium truncate max-w-[90px]">{work.assignee.name}</span>
-                                  </>
+                                    ))}
+                                  </div>
                                 ) : (
                                   <span className="text-zinc-500 italic">Unassigned</span>
                                 )}

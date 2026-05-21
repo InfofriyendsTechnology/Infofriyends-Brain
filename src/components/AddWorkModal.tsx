@@ -119,13 +119,13 @@ export default function AddWorkModal({ user }: { user: any }) {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label htmlFor="assigneeId" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Assign To Member</label>
+                <label htmlFor="assigneeIds" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Assign To Member(s)</label>
                 <select
-                  id="assigneeId"
-                  name="assigneeId"
-                  className="w-full bg-[#0d0e12] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#63BDF2]/50 transition-all"
+                  multiple
+                  id="assigneeIds"
+                  name="assigneeIds"
+                  className="w-full bg-[#0d0e12] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#63BDF2]/50 transition-all custom-scrollbar min-h-[60px]"
                 >
-                  <option value="">Unassigned</option>
                   {members.filter(m => m.role !== 'ADMIN').map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name} ({m.role})

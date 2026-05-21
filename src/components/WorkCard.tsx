@@ -41,7 +41,7 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
                       (work.parentWorkId ? 10 : 0)
 
   const isAdmin = currentUser?.role === 'ADMIN'
-  const isCreatorOrAssignee = currentUser && (work.creatorId === currentUser.id || work.assigneeId === currentUser.id)
+  const isCreatorOrAssignee = currentUser && (work.creatorId === currentUser.id || work.assignees?.some((a: any) => a.id === currentUser.id))
   const isAuthorized = isAdmin || isCreatorOrAssignee
 
   const handleStatusChange = async (newStatus: string, reason?: string) => {
@@ -101,7 +101,9 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
       formData.append('name', editName)
       formData.append('description', editDesc)
       formData.append('priority', work.priority)
-      if (work.assigneeId) formData.append('assigneeId', work.assigneeId)
+      if (work.assignees) {
+        work.assignees.forEach((a: any) => formData.append('assigneeIds', a.id))
+      }
       if (work.dueDate) formData.append('dueDate', new Date(work.dueDate).toISOString())
       
       const res = await editWork(work.id, formData)
@@ -359,20 +361,23 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
             <span className="text-white/80 font-medium truncate max-w-[80px]">{work.creator?.name || 'System'}</span>
           </div>
 
-          {/* Assignee */}
+          {/* Assignees */}
           <div className="flex items-center gap-1.5">
             <span className="text-[9px] uppercase tracking-wider">Assigned:</span>
-            {work.assignee ? (
-              <>
-                {work.assignee.profilePhoto ? (
-                  <img src={work.assignee.profilePhoto} alt={work.assignee.name} className="w-4 h-4 rounded-full object-cover border border-white/10" />
-                ) : (
-                  <div className="w-4 h-4 rounded-full bg-[#63BDF2]/20 text-[#63BDF2] flex items-center justify-center font-bold text-[8px] uppercase">
-                    {work.assignee.name.charAt(0)}
+            {work.assignees && work.assignees.length > 0 ? (
+              <div className="flex -space-x-1.5 overflow-hidden">
+                {work.assignees.map((assignee: any) => (
+                  <div key={assignee.id} className="relative z-10" title={assignee.name}>
+                    {assignee.profilePhoto ? (
+                      <img src={assignee.profilePhoto} alt={assignee.name} className="w-4 h-4 rounded-full object-cover border border-[#0d0e12]" />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full bg-[#63BDF2]/20 text-[#63BDF2] flex items-center justify-center font-bold text-[8px] uppercase border border-[#0d0e12]">
+                        {assignee.name.charAt(0)}
+                      </div>
+                    )}
                   </div>
-                )}
-                <span className="text-white/80 font-medium truncate max-w-[80px]">{work.assignee.name}</span>
-              </>
+                ))}
+              </div>
             ) : (
               <span className="text-zinc-500 italic">Unassigned</span>
             )}

@@ -20,11 +20,13 @@ export async function createWork(formData: FormData) {
 
   const name = formData.get('name') as string
   const description = formData.get('description') as string
-  const assigneeId = formData.get('assigneeId') as string || null
   const priority = formData.get('priority') as string || 'MEDIUM'
   const status = formData.get('status') as string || 'IDEA'
   const dueDateStr = formData.get('dueDate') as string
   const parentWorkId = formData.get('parentWorkId') as string || null
+  
+  // Assignees
+  const assigneeIdsRaw = formData.getAll('assigneeIds') as string[]
   
   // Person Mentions from form data
   const personMentionsRaw = formData.get('personMentions') as string
@@ -43,9 +45,7 @@ export async function createWork(formData: FormData) {
   if (dueDateStr) {
     try {
       dueDate = new Date(dueDateStr)
-    } catch (e) {
-      // Ignore parse errors
-    }
+    } catch (e) {}
   }
 
   try {
@@ -57,53 +57,27 @@ export async function createWork(formData: FormData) {
         priority,
         dueDate,
         creatorId: user.id,
-        assigneeId: assigneeId || null,
-        parentWorkId: parentWorkId || null
+        parentWorkId: parentWorkId || null,
+        assignees: {
+          connect: assigneeIdsRaw.filter(Boolean).map(id => ({ id }))
+        }
       },
     })
     
-    // Work Mention Points
-    if (parentWorkId) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { totalPoints: { increment: 10 } }
-      })
-      await prisma.pointTransaction.create({
-        data: {
-          amount: 10,
-          reason: 'WORK_MENTION',
-          userId: user.id,
-          workId: work.id
-        }
-      })
-    }
-
-    // Person Mentions Points & Notifications
+    // Points are NOT awarded here anymore; they are deferred until work completion.
+    // We just record the person mentions with pointsAwarded = false
     for (const mentionedId of personMentionIds) {
       await prisma.personMention.create({
         data: {
           workId: work.id,
           userId: mentionedId,
-          pointsAwarded: true
+          pointsAwarded: false
         }
       })
-      await prisma.user.update({
-        where: { id: mentionedId },
-        data: { totalPoints: { increment: 10 } }
-      })
-      await prisma.pointTransaction.create({
-        data: {
-          amount: 10,
-          reason: 'PERSON_MENTION',
-          userId: mentionedId,
-          workId: work.id
-        }
-      })
-      
       await prisma.notification.create({
         data: {
           title: 'You were mentioned in an Idea!',
-          message: `${user.name} mentioned you as an idea creator in "${work.name}". You received 10 points!`,
+          message: `${user.name} mentioned you as an idea creator in "${work.name}". You'll receive 10 points when it's completed!`,
           type: 'INFO',
           userId: mentionedId
         }
@@ -111,7 +85,7 @@ export async function createWork(formData: FormData) {
     }
 
     // Log creation
-    await logActivity('CREATED_WORK', user.id, work.id, `Created work: "${name}" assigned to ${assigneeId ? 'member' : 'unassigned'} (Status: ${status}, Priority: ${priority})`)
+    await logActivity('CREATED_WORK', user.id, work.id, `Created work: "${name}" (Status: ${status}, Priority: ${priority})`)
     
     revalidatePath('/')
     revalidatePath('/works')
@@ -129,7 +103,7 @@ export async function editWork(id: string, formData: FormData) {
 
   const name = formData.get('name') as string
   const description = formData.get('description') as string
-  const assigneeId = formData.get('assigneeId') as string || null
+  const assigneeIdsRaw = formData.getAll('assigneeIds') as string[]
   const priority = formData.get('priority') as string || 'MEDIUM'
   const dueDateStr = formData.get('dueDate') as string
 
@@ -169,7 +143,9 @@ export async function editWork(id: string, formData: FormData) {
         description,
         priority,
         dueDate,
-        assigneeId: assigneeId || null,
+        assignees: {
+          set: assigneeIdsRaw.filter(Boolean).map(id => ({ id }))
+        },
         ...(user.role === 'ADMIN' && work.creatorId !== user.id && {
           editedByAdminId: user.id,
           editReason: 'Admin edited work details'
@@ -195,11 +171,15 @@ export async function updateWorkStatus(id: string, newStatus: string, blockedRea
   const user = session.user
 
   try {
-    const work = await prisma.work.findUnique({ where: { id }, include: { creator: true } })
+    const work = await prisma.work.findUnique({ 
+      where: { id }, 
+      include: { creator: true, assignees: true, personMentions: true, parentWork: true } 
+    })
     if (!work) return { success: false, error: 'Work not found' }
 
     // Admins can do anything. Members can update if they are creator or assignee.
-    const isAuthorized = user.role === 'ADMIN' || work.creatorId === user.id || work.assigneeId === user.id
+    const isAssignee = work.assignees.some(a => a.id === user.id)
+    const isAuthorized = user.role === 'ADMIN' || work.creatorId === user.id || isAssignee
     if (!isAuthorized) {
       return { success: false, error: 'You are not authorized to update this work item' }
     }
@@ -219,6 +199,48 @@ export async function updateWorkStatus(id: string, newStatus: string, blockedRea
         })
       },
     })
+
+    // Award Points if completed and idea points haven't been awarded yet
+    if (newStatus === 'COMPLETED' && !work.ideaPointsAwarded) {
+      if (work.parentWorkId) {
+        await prisma.user.update({
+          where: { id: work.creatorId },
+          data: { totalPoints: { increment: 10 } }
+        })
+        await prisma.pointTransaction.create({
+          data: { amount: 10, reason: 'WORK_MENTION', userId: work.creatorId, workId: work.id }
+        })
+      }
+
+      for (const mention of work.personMentions) {
+        if (!mention.pointsAwarded) {
+          await prisma.personMention.update({
+            where: { id: mention.id },
+            data: { pointsAwarded: true }
+          })
+          await prisma.user.update({
+            where: { id: mention.userId },
+            data: { totalPoints: { increment: 10 } }
+          })
+          await prisma.pointTransaction.create({
+            data: { amount: 10, reason: 'PERSON_MENTION', userId: mention.userId, workId: work.id }
+          })
+          await prisma.notification.create({
+            data: {
+              title: 'Idea Completed! Points Awarded!',
+              message: `The idea "${work.name}" you were mentioned in has been completed. You received 10 points!`,
+              type: 'INFO',
+              userId: mention.userId
+            }
+          })
+        }
+      }
+
+      await prisma.work.update({
+        where: { id },
+        data: { ideaPointsAwarded: true }
+      })
+    }
 
     // Log the action
     let logMsg = `Status changed to ${newStatus}.`
@@ -268,7 +290,7 @@ export async function getWorks() {
     const data = await prisma.work.findMany({
       include: {
         creator: { select: { id: true, name: true, profilePhoto: true, role: true } },
-        assignee: { select: { id: true, name: true, profilePhoto: true, role: true } },
+        assignees: { select: { id: true, name: true, profilePhoto: true, role: true } },
         editedByAdmin: { select: { name: true } },
         workUpdates: {
           include: {
@@ -410,7 +432,7 @@ export async function getIdeasWithSupports() {
       },
       include: {
         creator: { select: { id: true, name: true, profilePhoto: true, role: true } },
-        assignee: { select: { id: true, name: true, profilePhoto: true, role: true } },
+        assignees: { select: { id: true, name: true, profilePhoto: true, role: true } },
         personMentions: {
           include: {
             user: { select: { id: true, name: true, profilePhoto: true, role: true } }
@@ -466,11 +488,7 @@ export async function queueIdea(workId: string) {
     const isAuthorized = user.role === 'ADMIN' || work.creatorId === user.id
     if (!isAuthorized) return { success: false, error: 'Not authorized' }
 
-    if (work.status === 'QUEUED') {
-      return { success: false, error: 'This proposal is already in the execution queue.' }
-    }
-
-    const newStatus = 'QUEUED'
+    const newStatus = work.status === 'QUEUED' ? 'IDEA' : 'QUEUED'
     
     await prisma.work.update({
       where: { id: workId },
@@ -478,10 +496,10 @@ export async function queueIdea(workId: string) {
     })
 
     await logActivity(
-      'QUEUED_IDEA',
-      user.id,
-      workId,
-      `Moved proposal "${work.name}" to execution queue — ready for work`
+      newStatus === 'QUEUED' ? 'QUEUE_IDEA' : 'UNQUEUE_IDEA', 
+      user.id, 
+      workId, 
+      newStatus === 'QUEUED' ? `Added proposal "${work.name}" to the execution queue.` : `Removed proposal "${work.name}" from the execution queue.`
     )
 
     revalidatePath('/')
@@ -766,6 +784,39 @@ export async function removeDisagree(workId: string) {
     return { success: true }
   } catch (error: any) {
     console.error('Failed to remove disagree:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+export async function convertIdeaToWork(workId: string, formData: FormData) {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Unauthorized' }
+  const user = session.user
+  const assigneeIdsRaw = formData.getAll('assigneeIds') as string[]
+  const expectedDurationRaw = formData.get('expectedDurationHours') as string
+  const expectedDurationHours = expectedDurationRaw ? parseInt(expectedDurationRaw, 10) : null
+
+  try {
+    const work = await prisma.work.findUnique({ where: { id: workId } })
+    if (!work) return { success: false, error: 'Work not found' }
+    
+    await prisma.work.update({
+      where: { id: workId },
+      data: {
+        status: 'ACTIVE',
+        expectedDurationHours,
+        assignees: {
+          connect: assigneeIdsRaw.filter(Boolean).map(id => ({ id }))
+        }
+      }
+    })
+
+    await logActivity('CONVERT_WORK', user.id, workId, `Converted proposal to Active Work.`)
+    revalidatePath('/')
+    revalidatePath('/works')
+    revalidatePath('/proposals')
+    return { success: true }
+  } catch(error: any) {
     return { success: false, error: error.message }
   }
 }

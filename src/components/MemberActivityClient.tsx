@@ -29,7 +29,28 @@ interface Member {
   createdAt: string
   lastActive: string | null
   contributionScore: number
+  contributionScore: number
   averageRating?: number
+}
+
+function getRelativeTime(dateStr: string) {
+  const diff = new Date().getTime() - new Date(dateStr).getTime()
+  const mins = Math.round(diff / (1000 * 60))
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.round(hours / 24)}d ago`
+}
+
+function getActiveMembers(members: Member[]) {
+  const now = new Date()
+  return members.filter(m => {
+    if (m.role === 'ADMIN') return false
+    if (!m.lastActive) return false
+    const diff = now.getTime() - new Date(m.lastActive).getTime()
+    return diff < 24 * 60 * 60 * 1000
+  })
 }
 
 import { impersonateMemberAction } from '@/app/actions/admin'
@@ -44,7 +65,7 @@ interface MemberActivityClientProps {
 export default function MemberActivityClient({ members, works, currentUserId, currentUserRole }: MemberActivityClientProps) {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
+  const [viewMode, setViewMode] = useState<'grid' | 'table' | 'active'>('grid')
 
   const filteredMembers = members.filter(member => 
     member.role !== 'ADMIN' &&
@@ -54,6 +75,12 @@ export default function MemberActivityClient({ members, works, currentUserId, cu
 
   // Sort members by contribution score (descending)
   const sortedMembers = [...filteredMembers].sort((a, b) => b.contributionScore - a.contributionScore)
+
+  const activeMembersSorted = getActiveMembers(members).sort((a, b) => {
+    const rankA = sortedMembers.findIndex(x => x.id === a.id)
+    const rankB = sortedMembers.findIndex(x => x.id === b.id)
+    return rankA - rankB
+  })
 
   return (
     <div className="space-y-6">
@@ -91,6 +118,16 @@ export default function MemberActivityClient({ members, works, currentUserId, cu
             }`}
           >
             <Table size={14} /> Table
+          </button>
+          <button
+            onClick={() => setViewMode('active')}
+            className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold tracking-wider uppercase transition-all duration-300 ${
+              viewMode === 'active' 
+                ? 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-400 shadow-md shadow-amber-500/5' 
+                : 'text-zinc-400 hover:text-white border border-transparent'
+            }`}
+          >
+            <Clock size={14} /> Active
           </button>
           </div>
         </div>
@@ -241,7 +278,7 @@ export default function MemberActivityClient({ members, works, currentUserId, cu
               )
             })}
           </motion.div>
-        ) : (
+        ) : viewMode === 'table' ? (
           <motion.div
             key="table"
             initial={{ opacity: 0, y: 15 }}
@@ -338,7 +375,70 @@ export default function MemberActivityClient({ members, works, currentUserId, cu
               </tbody>
             </table>
           </motion.div>
-        )}
+        ) : viewMode === 'active' ? (
+          <motion.div
+            key="active"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            className="max-w-2xl mx-auto space-y-4"
+          >
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-black uppercase text-zinc-500 tracking-wider mb-2 block px-2">Active Today ({activeMembersSorted.length})</span>
+              <div className="space-y-2">
+                {activeMembersSorted.map((m) => {
+                  const rank = sortedMembers.findIndex(x => x.id === m.id) + 1
+                  const relativeTime = m.lastActive ? getRelativeTime(m.lastActive) : 'Offline'
+                  
+                  return (
+                    <div 
+                      key={m.id} 
+                      onClick={() => router.push(`/members/${m.id}`)}
+                      className={`flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-300 cursor-pointer ${
+                        rank === 1 ? 'bg-amber-500/5 border-amber-500/20 hover:border-amber-500/40 hover:bg-amber-500/10' : 
+                        rank === 2 ? 'bg-zinc-300/5 border-zinc-500/20 hover:border-zinc-500/40 hover:bg-zinc-300/10' : 
+                        rank === 3 ? 'bg-amber-700/5 border-amber-700/20 hover:border-amber-700/40 hover:bg-amber-700/10' : 
+                        'bg-zinc-900/40 border-white/5 hover:border-white/10 hover:bg-zinc-900/60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm uppercase shrink-0 ${
+                          rank === 1 ? 'bg-amber-500/20 text-amber-400' : 
+                          rank === 2 ? 'bg-zinc-300/20 text-zinc-300' :
+                          rank === 3 ? 'bg-amber-700/20 text-amber-600' :
+                          'bg-primary/20 text-primary'
+                        }`}>
+                          {m.name.charAt(0)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-sm font-bold text-white truncate mb-0.5">{m.name}</h4>
+                          <span className="text-xs text-muted-foreground font-mono block truncate">@{m.username}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-xs font-mono text-emerald-400 font-bold text-right">{relativeTime}</span>
+                        <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                          rank === 1 ? 'bg-amber-500 text-black' : 
+                          rank === 2 ? 'bg-zinc-300 text-black' : 
+                          rank === 3 ? 'bg-amber-700 text-white' : 
+                          'bg-secondary text-muted-foreground'
+                        }`}>
+                          {rank}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+                {activeMembersSorted.length === 0 && (
+                  <div className="p-8 text-center bg-zinc-900/30 rounded-2xl border border-white/5 text-muted-foreground text-sm">
+                    No members active today.
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        ) : null}
       </AnimatePresence>
 
 

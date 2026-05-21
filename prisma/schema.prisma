@@ -37,7 +37,7 @@ model User {
   worksCreated      Work[]          @relation("WorkCreator")
   worksOriginal     Work[]          @relation("WorkOriginalOwner")
   worksEdited       Work[]          @relation("WorkEditor")
-  worksAssigned     Work[]          @relation("WorkAssignee")
+  worksAssigned     Work[]          @relation("WorkAssignees")
   workUpdates       WorkUpdate[]
   activityLogs      ActivityLog[]
   communityPosts    CommunityPost[]
@@ -70,8 +70,7 @@ model Work {
   creatorId       String
   creator         User     @relation("WorkCreator", fields: [creatorId], references: [id])
   
-  assigneeId      String?
-  assignee        User?    @relation("WorkAssignee", fields: [assigneeId], references: [id])
+  assignees       User[]   @relation("WorkAssignees")
 
   workUpdates     WorkUpdate[]
   
@@ -81,6 +80,9 @@ model Work {
   editedByAdminId String?
   editedByAdmin   User?    @relation("WorkEditor", fields: [editedByAdminId], references: [id])
   editReason      String?  @db.Text
+
+  expectedDurationHours Int?
+  ideaPointsAwarded Boolean @default(false)
 
   supports        IdeaSupport[]
   disagrees       IdeaDisagree[]

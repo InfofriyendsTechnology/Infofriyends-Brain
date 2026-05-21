@@ -134,57 +134,6 @@ export default function DashboardMetrics({
             <p className="text-[10px] md:text-xs text-muted-foreground">{metric.description}</p>
           </div>
 
-          {/* Active members list - only for the Active Members card */}
-          {metric.title === 'Active Members' && activeMembersSorted.length > 0 && (
-            <div className="flex flex-col gap-1.5 mt-4 pt-3 border-t border-white/5 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
-              <span className="text-[8px] font-black uppercase text-zinc-500 tracking-wider mb-1 block">Active Today</span>
-              <div className="space-y-1.5">
-                {activeMembersSorted.map((m) => {
-                  const rank = sortedNonAdmins.findIndex(x => x.id === m.id) + 1
-                  const relativeTime = m.lastActive ? getRelativeTime(m.lastActive) : 'Offline'
-                  
-                  return (
-                    <div 
-                      key={m.id} 
-                      className={`flex items-center justify-between gap-2 p-1.5 rounded-xl border transition-all duration-300 ${
-                        rank === 1 ? 'bg-amber-500/5 border-amber-500/20 hover:border-amber-500/40' : 
-                        rank === 2 ? 'bg-zinc-300/5 border-zinc-500/20 hover:border-zinc-500/40' : 
-                        rank === 3 ? 'bg-amber-700/5 border-amber-700/20 hover:border-amber-700/40' : 
-                        'bg-white/[0.02] border-white/5 hover:border-white/10'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center font-black text-[10px] uppercase shrink-0 ${
-                          rank === 1 ? 'bg-amber-500/20 text-amber-400' : 
-                          rank === 2 ? 'bg-zinc-300/20 text-zinc-300' :
-                          rank === 3 ? 'bg-amber-700/20 text-amber-600' :
-                          'bg-primary/20 text-primary'
-                        }`}>
-                          {m.name.charAt(0)}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h4 className="text-[10px] font-semibold text-white truncate leading-none mb-0.5">{m.name}</h4>
-                          <span className="text-[8px] text-muted-foreground font-mono block truncate">@{m.username}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[8px] font-mono text-emerald-400 font-bold text-right">{relativeTime}</span>
-                        <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 ${
-                          rank === 1 ? 'bg-amber-500 text-black' : 
-                          rank === 2 ? 'bg-zinc-300 text-black' : 
-                          rank === 3 ? 'bg-amber-700 text-white' : 
-                          'bg-secondary text-muted-foreground'
-                        }`}>
-                          {rank}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
         </motion.div>
       ))}
     </div>
