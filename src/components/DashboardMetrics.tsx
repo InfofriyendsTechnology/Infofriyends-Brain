@@ -1,9 +1,59 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { Activity, CheckCircle2, MessageSquare, Award } from 'lucide-react'
+import { Activity, CheckCircle2, MessageSquare, Users, Clock } from 'lucide-react'
 
-export default function DashboardMetrics({ activeWorks, completedWorks, totalPosts }: { activeWorks: number, completedWorks: number, totalPosts: number }) {
+interface MemberInfo {
+  id: string
+  name: string
+  lastActive: string | null
+  role: string
+  profilePhoto?: string | null
+}
+
+function getActiveMembers(members: MemberInfo[]) {
+  const now = new Date()
+  // A member is "active" if they were active within the last 24 hours
+  return members.filter(m => {
+    if (m.role === 'ADMIN') return false
+    if (!m.lastActive) return false
+    const diff = now.getTime() - new Date(m.lastActive).getTime()
+    return diff < 24 * 60 * 60 * 1000 // 24 hours
+  })
+}
+
+function getAvgActiveHours(members: MemberInfo[]) {
+  const now = new Date()
+  const activeMembers = members.filter(m => {
+    if (m.role === 'ADMIN') return false
+    if (!m.lastActive) return false
+    const diff = now.getTime() - new Date(m.lastActive).getTime()
+    return diff < 24 * 60 * 60 * 1000
+  })
+  if (activeMembers.length === 0) return 0
+  const totalHours = activeMembers.reduce((sum, m) => {
+    const diff = now.getTime() - new Date(m.lastActive!).getTime()
+    const hours = Math.min(24, diff / (1000 * 60 * 60))
+    return sum + (24 - hours) // hours they've been active (inverse of how long ago)
+  }, 0)
+  return Math.round(totalHours / activeMembers.length * 10) / 10
+}
+
+export default function DashboardMetrics({ 
+  activeWorks, 
+  completedWorks, 
+  totalPosts,
+  members = []
+}: { 
+  activeWorks: number
+  completedWorks: number
+  totalPosts: number
+  members?: MemberInfo[]
+}) {
+  const activeMembers = getActiveMembers(members)
+  const totalNonAdmin = members.filter(m => m.role !== 'ADMIN').length
+  const avgHours = getAvgActiveHours(members)
+
   const metrics = [
     {
       title: 'Active Work',
@@ -30,12 +80,13 @@ export default function DashboardMetrics({ activeWorks, completedWorks, totalPos
       description: 'Asynchronous momentum'
     },
     {
-      title: 'Workspace Health',
-      value: '98%',
-      icon: <Award className="text-amber-400" size={20} />,
+      title: 'Active Members',
+      value: activeMembers.length,
+      icon: <Users className="text-amber-400" size={20} />,
       bgColor: 'bg-amber-500/10',
       borderColor: 'border-amber-500/20',
-      description: 'Active asynchronously'
+      description: `of ${totalNonAdmin} • ~${avgHours}h avg today`,
+      extra: activeMembers.length > 0 ? activeMembers : null
     }
   ]
 
@@ -47,7 +98,7 @@ export default function DashboardMetrics({ activeWorks, completedWorks, totalPos
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.05 }}
-          className={`relative overflow-hidden p-5 rounded-2xl border ${metric.borderColor} bg-secondary/15 backdrop-blur-md hover:bg-secondary/20 transition-all duration-300`}
+          className={`relative overflow-hidden p-5 rounded-2xl border ${metric.borderColor} bg-secondary/15 backdrop-blur-md hover:bg-secondary/20 transition-all duration-300 group`}
         >
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs md:text-sm font-semibold text-muted-foreground">{metric.title}</span>
@@ -59,6 +110,43 @@ export default function DashboardMetrics({ activeWorks, completedWorks, totalPos
             <h3 className="text-2xl md:text-3xl font-black text-white">{metric.value}</h3>
             <p className="text-[10px] md:text-xs text-muted-foreground">{metric.description}</p>
           </div>
+
+          {/* Active members mini-avatars row - only for the Active Members card */}
+          {metric.extra && (
+            <div className="flex items-center gap-1 mt-3 pt-3 border-t border-white/5">
+              <div className="flex -space-x-2">
+                {metric.extra.slice(0, 5).map((m: MemberInfo) => (
+                  <div
+                    key={m.id}
+                    title={m.name}
+                    className="relative"
+                  >
+                    {m.profilePhoto ? (
+                      <img
+                        src={m.profilePhoto}
+                        alt={m.name}
+                        className="w-6 h-6 rounded-full border-2 border-[#09090b] object-cover"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full border-2 border-[#09090b] bg-gradient-to-br from-amber-500/30 to-orange-500/30 flex items-center justify-center text-[8px] font-black text-amber-400 uppercase">
+                        {m.name.charAt(0)}
+                      </div>
+                    )}
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 border border-[#09090b] rounded-full" />
+                  </div>
+                ))}
+              </div>
+              {metric.extra.length > 5 && (
+                <span className="text-[9px] font-bold text-zinc-500 ml-1">
+                  +{metric.extra.length - 5}
+                </span>
+              )}
+              <div className="flex items-center gap-1 ml-auto">
+                <Clock size={9} className="text-emerald-500" />
+                <span className="text-[9px] font-bold text-emerald-400">Online</span>
+              </div>
+            </div>
+          )}
         </motion.div>
       ))}
     </div>

@@ -427,6 +427,18 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
           <p className={`text-xs sm:text-sm leading-relaxed whitespace-pre-wrap ${isArchived ? 'text-zinc-500' : 'text-zinc-300'}`}>
             {idea.description}
           </p>
+
+          {/* Mentions / Idea Creators */}
+          {idea.personMentions && idea.personMentions.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-4">
+              <span className="text-[10px] font-bold text-yellow-500/70 uppercase tracking-wider flex items-center mr-1">Creators:</span>
+              {idea.personMentions.map((mention: any) => (
+                <span key={mention.id} className="text-[9px] px-2 py-0.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 font-bold uppercase">
+                  @{mention.user.name}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Decline Reason Banner */}

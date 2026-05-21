@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LayoutDashboard, Briefcase, Shield, LogOut, Plus, User, HelpCircle, MessageSquare, MoreHorizontal, EyeOff, ChevronUp, Lightbulb, Users } from 'lucide-react'
+import { LayoutDashboard, Briefcase, Shield, LogOut, Plus, User, MessageSquare, MoreHorizontal, EyeOff, ChevronUp, Lightbulb, Users } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { logoutAction } from '@/app/actions/auth'
 import { useState, useEffect } from 'react'
@@ -30,7 +30,6 @@ export default function Sidebar({ session }: { session: any }) {
     { name: 'Team Members', href: '/members', icon: <Users size={20} /> },
     { name: 'Team Chat', href: '/chat', icon: <MessageSquare size={20} /> },
     { name: 'Profile Settings', href: '/profile', icon: <User size={20} /> },
-    { name: 'How It Works', href: '/docs', icon: <HelpCircle size={20} /> },
     ...(session?.user?.role === 'ADMIN' ? [{ name: 'Admin Panel', href: '/admin', icon: <Shield size={20} /> }] : [])
   ]
 
@@ -163,16 +162,7 @@ export default function Sidebar({ session }: { session: any }) {
                 </Link>
               )}
 
-              <Link
-                href="/docs"
-                onClick={() => setShowMoreMenu(false)}
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                  pathname === '/docs' ? 'text-[#63BDF2] bg-[#63BDF2]/10' : 'text-muted-foreground hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <HelpCircle size={16} />
-                <span>How It Works</span>
-              </Link>
+
 
               <button
                 onClick={() => {

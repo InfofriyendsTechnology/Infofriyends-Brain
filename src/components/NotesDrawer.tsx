@@ -1,20 +1,18 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   X, 
   BookOpen, 
   Plus, 
   Trash2, 
-  Edit3, 
-  Check, 
   Calendar, 
   Clock, 
   BellRing,
-  Sparkles,
-  Archive,
-  Save
+  Save,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import { 
   getNotesAction, 
@@ -34,14 +32,9 @@ interface NoteItem {
 }
 
 // Preset color nodes for quick customization
-const COLORS = [
-  { hex: '#63BDF2', label: 'Cyan' },
-  { hex: '#10B981', label: 'Emerald' },
-  { hex: '#F59E0B', label: 'Gold' },
-  { hex: '#EF4444', label: 'Crimson' },
-  { hex: '#EC4899', label: 'Rose' },
-  { hex: '#71717A', label: 'Carbon' }
-]
+
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+const DAYS_SHORT = ['Su','Mo','Tu','We','Th','Fr','Sa']
 
 // Web Audio API Synthesizer to render a futuristic alert chime
 const playCyberChime = () => {
@@ -80,6 +73,242 @@ const playCyberChime = () => {
     console.error('Synthesized chime failure:', err)
   }
 }
+
+// ==================== Custom Calendar + Time Picker ====================
+function ReminderPicker({ value, onChange }: { value: string; onChange: (val: string) => void }) {
+  const now = new Date()
+  
+  // Parse existing value or default to now
+  const parsed = value ? new Date(value) : null
+  const [viewYear, setViewYear] = useState(parsed ? parsed.getFullYear() : now.getFullYear())
+  const [viewMonth, setViewMonth] = useState(parsed ? parsed.getMonth() : now.getMonth())
+  const [selectedDay, setSelectedDay] = useState<number | null>(parsed ? parsed.getDate() : null)
+  const [hour, setHour] = useState(parsed ? (parsed.getHours() % 12 || 12) : 9)
+  const [minute, setMinute] = useState(parsed ? parsed.getMinutes() : 0)
+  const [period, setPeriod] = useState<'AM' | 'PM'>(parsed ? (parsed.getHours() >= 12 ? 'PM' : 'AM') : 'AM')
+
+  // Rebuild the ISO string whenever selection changes
+  useEffect(() => {
+    if (selectedDay === null) {
+      onChange('')
+      return
+    }
+    let h24 = hour % 12
+    if (period === 'PM') h24 += 12
+    const d = new Date(viewYear, viewMonth, selectedDay, h24, minute)
+    // Format as YYYY-MM-DDTHH:mm for datetime-local compatibility
+    const pad = (n: number) => n.toString().padStart(2, '0')
+    onChange(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`)
+  }, [selectedDay, hour, minute, period, viewYear, viewMonth])
+
+  // Calendar grid data
+  const calendarDays = useMemo(() => {
+    const firstDay = new Date(viewYear, viewMonth, 1).getDay()
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
+    const daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate()
+    
+    const cells: { day: number; currentMonth: boolean; isToday: boolean; isPast: boolean }[] = []
+    
+    // Previous month trailing days
+    for (let i = firstDay - 1; i >= 0; i--) {
+      cells.push({ day: daysInPrevMonth - i, currentMonth: false, isToday: false, isPast: true })
+    }
+    // Current month days
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(viewYear, viewMonth, d)
+      const today = new Date()
+      const isToday = d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear()
+      const isPast = date < new Date(today.getFullYear(), today.getMonth(), today.getDate())
+      cells.push({ day: d, currentMonth: true, isToday, isPast })
+    }
+    // Next month leading days to complete the last row
+    const remaining = 7 - (cells.length % 7)
+    if (remaining < 7) {
+      for (let d = 1; d <= remaining; d++) {
+        cells.push({ day: d, currentMonth: false, isToday: false, isPast: false })
+      }
+    }
+    return cells
+  }, [viewYear, viewMonth])
+
+  const goToPrevMonth = () => {
+    if (viewMonth === 0) {
+      setViewMonth(11)
+      setViewYear(y => y - 1)
+    } else {
+      setViewMonth(m => m - 1)
+    }
+  }
+
+  const goToNextMonth = () => {
+    if (viewMonth === 11) {
+      setViewMonth(0)
+      setViewYear(y => y + 1)
+    } else {
+      setViewMonth(m => m + 1)
+    }
+  }
+
+  const clearReminder = () => {
+    setSelectedDay(null)
+    onChange('')
+  }
+
+  const hourOptions = Array.from({ length: 12 }, (_, i) => i + 1)
+  const minuteOptions = Array.from({ length: 12 }, (_, i) => i * 5)
+
+  return (
+    <div className="space-y-3">
+      {/* Calendar Header */}
+      <div className="flex items-center justify-between mb-1">
+        <button
+          type="button"
+          onClick={goToPrevMonth}
+          className="p-1.5 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition-all cursor-pointer"
+        >
+          <ChevronLeft size={14} />
+        </button>
+        <span className="text-[10px] font-black uppercase tracking-wider text-white">
+          {MONTHS[viewMonth]} {viewYear}
+        </span>
+        <button
+          type="button"
+          onClick={goToNextMonth}
+          className="p-1.5 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition-all cursor-pointer"
+        >
+          <ChevronRight size={14} />
+        </button>
+      </div>
+
+      {/* Day Headers */}
+      <div className="grid grid-cols-7 gap-0.5">
+        {DAYS_SHORT.map(d => (
+          <div key={d} className="text-center text-[8px] font-black uppercase text-zinc-500 tracking-wider py-1">
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Day Grid */}
+      <div className="grid grid-cols-7 gap-0.5">
+        {calendarDays.map((cell, idx) => {
+          const isSelected = cell.currentMonth && cell.day === selectedDay
+          const isDisabled = !cell.currentMonth || cell.isPast
+          return (
+            <button
+              key={idx}
+              type="button"
+              disabled={isDisabled}
+              onClick={() => setSelectedDay(cell.day)}
+              className={`
+                relative w-full aspect-square flex items-center justify-center rounded-lg text-[10px] font-bold transition-all cursor-pointer
+                ${isDisabled ? 'text-zinc-700 cursor-not-allowed' : 'hover:bg-white/10 text-zinc-300'}
+                ${cell.isToday && !isSelected ? 'text-[#63BDF2] ring-1 ring-[#63BDF2]/30' : ''}
+                ${isSelected ? 'bg-[#63BDF2] text-black font-black shadow-[0_0_12px_rgba(99,189,242,0.4)] ring-0' : ''}
+              `}
+            >
+              {cell.day}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Time Selector - appears after selecting a day */}
+      <AnimatePresence>
+        {selectedDay !== null && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="pt-3 border-t border-white/5 space-y-2.5">
+              <label className="text-[9px] font-black uppercase text-zinc-500 tracking-wider flex items-center gap-1">
+                <Clock size={10} className="text-[#63BDF2]" /> Set Time
+              </label>
+              <div className="flex items-center gap-2">
+                {/* Hour */}
+                <div className="flex-1 relative">
+                  <select
+                    value={hour}
+                    onChange={e => setHour(Number(e.target.value))}
+                    className="w-full bg-zinc-950/80 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-bold appearance-none cursor-pointer focus:outline-none focus:border-[#63BDF2]/40 text-center"
+                  >
+                    {hourOptions.map(h => (
+                      <option key={h} value={h}>{h.toString().padStart(2, '0')}</option>
+                    ))}
+                  </select>
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[7px] text-zinc-600 font-bold pointer-events-none">HR</span>
+                </div>
+
+                <span className="text-zinc-500 font-black text-sm">:</span>
+
+                {/* Minute */}
+                <div className="flex-1 relative">
+                  <select
+                    value={minute}
+                    onChange={e => setMinute(Number(e.target.value))}
+                    className="w-full bg-zinc-950/80 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-bold appearance-none cursor-pointer focus:outline-none focus:border-[#63BDF2]/40 text-center"
+                  >
+                    {minuteOptions.map(m => (
+                      <option key={m} value={m}>{m.toString().padStart(2, '0')}</option>
+                    ))}
+                  </select>
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[7px] text-zinc-600 font-bold pointer-events-none">MIN</span>
+                </div>
+
+                {/* AM/PM Toggle */}
+                <div className="flex bg-zinc-950/80 border border-white/10 rounded-xl overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setPeriod('AM')}
+                    className={`px-3 py-2.5 text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                      period === 'AM' 
+                        ? 'bg-[#63BDF2] text-black' 
+                        : 'text-zinc-500 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    AM
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPeriod('PM')}
+                    className={`px-3 py-2.5 text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                      period === 'PM' 
+                        ? 'bg-[#63BDF2] text-black' 
+                        : 'text-zinc-500 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    PM
+                  </button>
+                </div>
+              </div>
+
+              {/* Selected datetime preview + clear */}
+              <div className="flex items-center justify-between bg-zinc-950/60 border border-white/5 rounded-xl px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <BellRing size={10} className="text-yellow-400" />
+                  <span className="text-[10px] text-zinc-300 font-bold">
+                    {MONTHS[viewMonth].slice(0, 3)} {selectedDay}, {viewYear} — {hour.toString().padStart(2, '0')}:{minute.toString().padStart(2, '0')} {period}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearReminder}
+                  className="text-[8px] font-black uppercase text-red-400 hover:text-red-300 tracking-wider cursor-pointer hover:bg-red-500/10 px-2 py-1 rounded-md transition-all"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// ==================== Main Component ====================
 
 interface NotesDrawerProps {
   isOpen: boolean
@@ -403,41 +632,17 @@ export default function NotesDrawer({ isOpen, onClose }: NotesDrawerProps) {
                       />
                     </div>
 
-                    {/* Color Presets */}
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-black uppercase text-zinc-500 tracking-wider block">Visual Label Tag</label>
-                      <div className="flex gap-2">
-                        {COLORS.map((c) => (
-                          <button
-                            key={c.hex}
-                            onClick={() => setColor(c.hex)}
-                            className="w-6 h-6 rounded-full flex items-center justify-center cursor-pointer transition-transform duration-200 border border-white/10 active:scale-90"
-                            style={{ backgroundColor: c.hex }}
-                            title={c.label}
-                          >
-                            {color === c.hex && (
-                              <Check size={10} className="text-black stroke-[4px]" />
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
 
-                    {/* Scheduler alarm */}
-                    <div className="space-y-1.5">
+                    {/* Reminder Calendar + Time Picker */}
+                    <div className="space-y-2.5">
                       <label className="text-[9px] font-black uppercase text-zinc-500 tracking-wider flex items-center gap-1">
                         <Calendar size={10} className="text-[#63BDF2]" /> Optional Reminder
                       </label>
-                      <div className="relative">
-                        <input
-                          type="datetime-local"
-                          value={reminderAt}
-                          onChange={(e) => setReminderAt(e.target.value)}
-                          className="w-full bg-zinc-950/60 border border-white/5 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-[#63BDF2]/40 transition-colors font-semibold appearance-none"
-                        />
+                      <div className="bg-zinc-950/60 border border-white/5 rounded-2xl p-4">
+                        <ReminderPicker value={reminderAt} onChange={setReminderAt} />
                       </div>
                       <p className="text-[8px] text-zinc-500 leading-normal">
-                        Systems automatically play a chiptone chime when the scheduled timer triggers.
+                        Select a date and time. A chiptone chime will play when the reminder triggers.
                       </p>
                     </div>
 

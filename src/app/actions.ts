@@ -411,6 +411,11 @@ export async function getIdeasWithSupports() {
       include: {
         creator: { select: { id: true, name: true, profilePhoto: true, role: true } },
         assignee: { select: { id: true, name: true, profilePhoto: true, role: true } },
+        personMentions: {
+          include: {
+            user: { select: { id: true, name: true, profilePhoto: true, role: true } }
+          }
+        },
         supports: {
           include: {
             user: { select: { id: true, name: true, profilePhoto: true, role: true } }

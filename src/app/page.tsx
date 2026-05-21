@@ -17,9 +17,11 @@ export const dynamic = 'force-dynamic'
 async function MetricsSection() {
   let works: any[] = []
   let posts: any[] = []
+  let members: any[] = []
   try {
     works = await getWorks()
     posts = await getCommunityPosts()
+    members = await getMembers()
   } catch (e) {}
 
   const activeWorksCount = works.filter(w => w.status === 'Active' || w.status === 'ACTIVE').length
@@ -30,7 +32,14 @@ async function MetricsSection() {
     <DashboardMetrics 
       activeWorks={activeWorksCount} 
       completedWorks={completedWorksCount} 
-      totalPosts={totalPostsCount} 
+      totalPosts={totalPostsCount}
+      members={members.map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        lastActive: m.lastActive,
+        role: m.role,
+        profilePhoto: m.profilePhoto
+      }))}
     />
   )
 }

@@ -83,6 +83,7 @@ export async function getMembers() {
         createdAt: true,
         profilePhoto: true,
         mobile: true,
+        lastActive: true,
         worksCreated: {
           select: {
             id: true,
