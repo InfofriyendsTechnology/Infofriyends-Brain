@@ -1,7 +1,7 @@
 'use client'
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { updateWorkStatus, addWorkUpdate, editWork, submitWorkReview } from '@/app/actions'
+import { updateWorkStatus, addWorkUpdate, editWork, logWorkTime } from '@/app/actions'
 import { useState } from 'react'
 import { 
   CheckCircle2, Circle, Archive, Clock, ShieldAlert, Sparkles, 
@@ -25,9 +25,9 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
   const [showDeleteInput, setShowDeleteInput] = useState(false)
   const [deleteReason, setDeleteReason] = useState('')
 
-  // Review State
-  const [rating, setRating] = useState(0)
-  const [feedback, setFeedback] = useState('')
+  // Time Logging State
+  const [showTimeLog, setShowTimeLog] = useState(false)
+  const [timeHours, setTimeHours] = useState('')
 
   const isCompleted = work.status === 'COMPLETED'
   const isArchived = work.status === 'ARCHIVED'
@@ -36,7 +36,9 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
   const isActive = work.status === 'ACTIVE'
   const isDeleted = work.status === 'DELETED'
 
-  const hasRated = work.reviews?.some((r: any) => r.reviewerId === currentUser?.id)
+  const totalPoints = (work.timeLogs?.reduce((acc: number, log: any) => acc + log.points, 0) || 0) + 
+                      (work.personMentions?.length ? 10 : 0) + 
+                      (work.parentWorkId ? 10 : 0)
 
   const isAdmin = currentUser?.role === 'ADMIN'
   const isCreatorOrAssignee = currentUser && (work.creatorId === currentUser.id || work.assigneeId === currentUser.id)
@@ -55,11 +57,14 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
     }
   }
 
-  const handleReviewSubmit = async () => {
-    if (rating < 1 || rating > 5) return
+  const handleTimeLogSubmit = async () => {
+    const hours = parseFloat(timeHours)
+    if (isNaN(hours) || hours <= 0) return
     setIsUpdating(true)
     try {
-      await submitWorkReview(work.id, rating, feedback)
+      await logWorkTime(work.id, hours)
+      setShowTimeLog(false)
+      setTimeHours('')
     } catch (e) {
       console.error(e)
     } finally {
@@ -253,9 +258,17 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
       {/* Main Card Content */}
       <div className="space-y-4 flex-1">
         {/* Badges Row */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {getStatusBadge()}
-          {getPriorityBadge()}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {getStatusBadge()}
+            {getPriorityBadge()}
+          </div>
+          {totalPoints > 0 && (
+            <div className="flex items-center gap-1 bg-[#63BDF2]/10 border border-[#63BDF2]/20 px-2 py-0.5 rounded-md text-[10px] font-bold text-[#63BDF2]">
+              <Sparkles size={10} />
+              <span>{totalPoints} pts</span>
+            </div>
+          )}
         </div>
 
         {/* Name and Description */}
@@ -297,6 +310,23 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
           <div className="flex items-center gap-1.5 text-[10px] text-orange-400/90 font-bold bg-orange-500/5 border border-orange-500/10 px-2.5 py-1 rounded-xl w-fit">
             <Clock size={11} />
             <span>Due: <span suppressHydrationWarning>{new Date(work.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span></span>
+          </div>
+        )}
+
+        {/* Mentions Display */}
+        {(work.parentWork || (work.personMentions && work.personMentions.length > 0)) && (
+          <div className="flex flex-col gap-1.5 pt-2 border-t border-white/5">
+            {work.parentWork && (
+              <div className="flex items-center gap-1.5 text-[10px] text-[#63BDF2]/80 bg-[#63BDF2]/5 px-2 py-1 rounded-lg w-fit">
+                <span className="font-bold">Work Mention:</span> {work.parentWork.name}
+              </div>
+            )}
+            {work.personMentions && work.personMentions.length > 0 && (
+              <div className="flex items-center gap-1.5 text-[10px] text-purple-400/80 bg-purple-500/5 px-2 py-1 rounded-lg w-fit">
+                <span className="font-bold">Idea Creators:</span>
+                {work.personMentions.map((pm: any) => pm.user.name).join(', ')}
+              </div>
+            )}
           </div>
         )}
 
@@ -441,88 +471,83 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
       {/* Status Controls Panel */}
       {isAuthorized && (
         <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
-          {/* Review Section for Completed Works */}
-          {isCompleted && (
+          {/* Time Logging Section for Active Works */}
+          {(isActive || isCompleted) && (
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Peer Reviews</span>
-                {work.reviews?.length > 0 && (
-                  <div className="flex items-center gap-1 text-amber-400">
+                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Time Log</span>
+                {work.timeLogs?.length > 0 && (
+                  <div className="flex items-center gap-1 text-[#63BDF2]">
                     <span className="text-xs font-black">
-                      {(work.reviews.reduce((acc: number, r: any) => acc + r.rating, 0) / work.reviews.length).toFixed(1)}
+                      {work.timeLogs.reduce((acc: number, l: any) => acc + l.hours, 0)}h
                     </span>
-                    <span className="text-[10px]">⭐</span>
-                    <span className="text-[9px] text-muted-foreground ml-1">({work.reviews.length})</span>
+                    <span className="text-[10px] text-muted-foreground ml-1">logged</span>
                   </div>
                 )}
               </div>
 
-              {!hasRated && (
-                <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 space-y-3">
+              {isAuthorized && !showTimeLog && (
+                 <button 
+                   onClick={() => setShowTimeLog(true)}
+                   className="bg-[#63BDF2]/10 hover:bg-[#63BDF2]/20 border border-[#63BDF2]/30 text-[#63BDF2] px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all w-fit cursor-pointer"
+                 >
+                   Log Time
+                 </button>
+              )}
+
+              {showTimeLog && (
+                <div className="bg-[#63BDF2]/5 border border-[#63BDF2]/20 rounded-xl p-3 space-y-3 animate-in fade-in slide-in-from-top-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-amber-500/70">Rate this work</span>
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          type="button"
-                          onClick={() => setRating(star)}
-                          className={`text-lg transition-all ${rating >= star ? 'text-amber-400 scale-110 drop-shadow-[0_0_5px_rgba(251,191,36,0.5)]' : 'text-zinc-600 hover:text-amber-400/50'}`}
-                        >
-                          ★
-                        </button>
-                      ))}
+                    <span className="text-xs font-bold text-[#63BDF2]/80">Log Hours (1h=1pt, 2h=2pt, 4h=5pt)</span>
+                  </div>
+                  <div className="space-y-2">
+                    <input 
+                      type="number"
+                      step="0.5"
+                      min="0.5"
+                      placeholder="Hours spent (e.g., 2)"
+                      value={timeHours}
+                      onChange={(e) => setTimeHours(e.target.value)}
+                      className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-[#63BDF2]/50"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button 
+                        type="button"
+                        onClick={() => setShowTimeLog(false)}
+                        className="px-2 py-1 text-[10px] text-zinc-400 hover:text-white"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        type="button"
+                        disabled={isUpdating || !timeHours}
+                        onClick={handleTimeLogSubmit}
+                        className="bg-[#63BDF2] hover:bg-[#3188DA] text-black px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider disabled:opacity-50 transition-colors"
+                      >
+                        Submit Time
+                      </button>
                     </div>
                   </div>
-                  {rating > 0 && (
-                    <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                      <input 
-                        type="text"
-                        placeholder="Optional feedback or point out mistakes..."
-                        value={feedback}
-                        onChange={(e) => setFeedback(e.target.value)}
-                        className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-amber-500/50"
-                      />
-                      <div className="flex justify-end">
-                        <button 
-                          type="button"
-                          disabled={isUpdating}
-                          onClick={handleReviewSubmit}
-                          className="bg-amber-500 hover:bg-amber-400 text-black px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider disabled:opacity-50 transition-colors"
-                        >
-                          Submit Review
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
 
-              {/* Display existing reviews */}
-              {work.reviews?.length > 0 && (
-                <div className="space-y-2 mt-2">
-                  {work.reviews.map((r: any) => (
-                    <div key={r.id} className="bg-white/5 border border-white/10 rounded-xl p-3 text-xs">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-1.5">
-                          {r.reviewer?.profilePhoto ? (
-                            <img src={r.reviewer.profilePhoto} alt={r.reviewer.name} className="w-4 h-4 rounded-full" />
-                          ) : (
-                            <User size={12} className="text-muted-foreground" />
-                          )}
-                          <span className="font-semibold text-white/90">{r.reviewer?.name}</span>
-                        </div>
-                        <div className="flex text-amber-400 text-[10px]">
-                          {Array.from({ length: 5 }).map((_, i) => (
-                            <span key={i} className={i < r.rating ? "opacity-100" : "opacity-30"}>★</span>
-                          ))}
-                        </div>
+              {/* Display existing time logs */}
+              {work.timeLogs?.length > 0 && (
+                <div className="space-y-2 mt-2 max-h-32 overflow-y-auto custom-scrollbar">
+                  {work.timeLogs.map((log: any) => (
+                    <div key={log.id} className="bg-white/5 border border-white/10 rounded-xl p-2 text-xs flex justify-between items-center">
+                      <div className="flex items-center gap-1.5">
+                        {log.user?.profilePhoto ? (
+                          <img src={log.user.profilePhoto} alt={log.user.name} className="w-4 h-4 rounded-full" />
+                        ) : (
+                          <User size={12} className="text-muted-foreground" />
+                        )}
+                        <span className="font-semibold text-white/90">{log.user?.name}</span>
                       </div>
-                      {r.feedback && (
-                        <p className="text-muted-foreground leading-relaxed italic border-l-2 border-white/10 pl-2 ml-1 mt-2">
-                          "{r.feedback}"
-                        </p>
-                      )}
+                      <div className="flex gap-2 text-[10px] font-bold">
+                        <span className="text-zinc-400">{log.hours}h</span>
+                        <span className="text-[#63BDF2]">+{log.points} pts</span>
+                      </div>
                     </div>
                   ))}
                 </div>

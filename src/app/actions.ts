@@ -23,6 +23,18 @@ export async function createWork(formData: FormData) {
   const priority = formData.get('priority') as string || 'MEDIUM'
   const status = formData.get('status') as string || 'IDEA'
   const dueDateStr = formData.get('dueDate') as string
+  const parentWorkId = formData.get('parentWorkId') as string || null
+  
+  // Person Mentions from form data
+  const personMentionsRaw = formData.get('personMentions') as string
+  let personMentionIds: string[] = []
+  if (personMentionsRaw) {
+    try {
+      personMentionIds = JSON.parse(personMentionsRaw)
+    } catch(e) {
+      personMentionIds = personMentionsRaw.split(',').map(id => id.trim()).filter(Boolean)
+    }
+  }
 
   if (!name || !description) return { success: false, error: 'Missing required fields' }
 
@@ -44,10 +56,59 @@ export async function createWork(formData: FormData) {
         priority,
         dueDate,
         creatorId: user.id,
-        assigneeId: assigneeId || null
+        assigneeId: assigneeId || null,
+        parentWorkId: parentWorkId || null
       },
     })
     
+    // Work Mention Points
+    if (parentWorkId) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { totalPoints: { increment: 10 } }
+      })
+      await prisma.pointTransaction.create({
+        data: {
+          amount: 10,
+          reason: 'WORK_MENTION',
+          userId: user.id,
+          workId: work.id
+        }
+      })
+    }
+
+    // Person Mentions Points & Notifications
+    for (const mentionedId of personMentionIds) {
+      await prisma.personMention.create({
+        data: {
+          workId: work.id,
+          userId: mentionedId,
+          pointsAwarded: true
+        }
+      })
+      await prisma.user.update({
+        where: { id: mentionedId },
+        data: { totalPoints: { increment: 10 } }
+      })
+      await prisma.pointTransaction.create({
+        data: {
+          amount: 10,
+          reason: 'PERSON_MENTION',
+          userId: mentionedId,
+          workId: work.id
+        }
+      })
+      
+      await prisma.notification.create({
+        data: {
+          title: 'You were mentioned in an Idea!',
+          message: `${user.name} mentioned you as an idea creator in "${work.name}". You received 10 points!`,
+          type: 'INFO',
+          userId: mentionedId
+        }
+      })
+    }
+
     // Log creation
     await logActivity('CREATED_WORK', user.id, work.id, `Created work: "${name}" assigned to ${assigneeId ? 'member' : 'unassigned'} (Status: ${status}, Priority: ${priority})`)
     
@@ -220,9 +281,15 @@ export async function getWorks() {
           },
           orderBy: { createdAt: 'desc' }
         },
-        reviews: {
+        parentWork: { select: { id: true, name: true } },
+        personMentions: {
           include: {
-            reviewer: { select: { id: true, name: true, profilePhoto: true } }
+            user: { select: { id: true, name: true, profilePhoto: true } }
+          }
+        },
+        timeLogs: {
+          include: {
+            user: { select: { id: true, name: true, profilePhoto: true } }
           },
           orderBy: { createdAt: 'desc' }
         }
@@ -235,45 +302,57 @@ export async function getWorks() {
     return []
   }
 }
-// Work Reviews
-export async function submitWorkReview(workId: string, rating: number, feedback?: string) {
+// Time Mention / Logging
+export async function logWorkTime(workId: string, hours: number) {
   const session = await getSession()
   if (!session) return { success: false, error: 'Unauthorized' }
   const user = session.user
 
-  if (rating < 1 || rating > 5) return { success: false, error: 'Rating must be between 1 and 5' }
+  if (hours <= 0) return { success: false, error: 'Hours must be greater than 0' }
 
   try {
     const work = await prisma.work.findUnique({ where: { id: workId } })
     if (!work) return { success: false, error: 'Work not found' }
-    if (work.status !== 'COMPLETED') return { success: false, error: 'Can only rate completed works' }
     
-    // Check if already rated
-    const existingReview = await prisma.workReview.findUnique({
-      where: { workId_reviewerId: { workId, reviewerId: user.id } }
-    })
+    // Calculate points (1h=1pt, 2h=2pt, 4h=5pt)
+    let points = 0;
+    if (hours >= 4) points = 5;
+    else if (hours >= 2) points = 2;
+    else if (hours >= 1) points = 1;
+    
+    if (points > 0) {
+      await prisma.timeLog.create({
+        data: {
+          hours,
+          points,
+          workId,
+          userId: user.id
+        }
+      })
 
-    if (existingReview) {
-      return { success: false, error: 'You have already reviewed this work' }
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { totalPoints: { increment: points } }
+      })
+
+      await prisma.pointTransaction.create({
+        data: {
+          amount: points,
+          reason: 'TIME_LOG',
+          userId: user.id,
+          workId
+        }
+      })
     }
 
-    await prisma.workReview.create({
-      data: {
-        workId,
-        reviewerId: user.id,
-        rating,
-        feedback
-      }
-    })
-
-    await logActivity('REVIEWED_WORK', user.id, workId, `Rated work ${rating} stars.`)
+    await logActivity('TIME_LOGGED', user.id, workId, `Logged ${hours} hours and earned ${points} points.`)
     
     revalidatePath('/')
     revalidatePath('/works')
     revalidatePath('/members')
     return { success: true }
   } catch (error: any) {
-    console.error('Failed to submit review:', error)
+    console.error('Failed to log time:', error)
     return { success: false, error: `Database error: ${error.message || error}` }
   }
 }

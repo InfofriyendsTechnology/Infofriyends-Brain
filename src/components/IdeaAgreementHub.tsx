@@ -7,7 +7,9 @@ import {
   ThumbsUp, Loader2, Play, ListOrdered, XCircle, Pause, RotateCcw, Trash2,
   ChevronDown, ChevronUp, History, ArrowRightCircle, AlertTriangle, Archive, Edit2
 } from 'lucide-react'
-import { createWork, updateWorkStatus, toggleIdeaSupport, queueIdea, declineIdea, shelveIdea, reviveIdea, deleteIdea, editWork } from '@/app/actions'
+import { createWork, updateWorkStatus, toggleIdeaSupport, queueIdea, declineIdea, shelveIdea, reviveIdea, deleteIdea, editWork, getWorks } from '@/app/actions'
+import { getMembers } from '@/app/actions/admin'
+import { useEffect } from 'react'
 import SectionGuide from './SectionGuide'
 
 interface Idea {
@@ -98,6 +100,25 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
   const [declineReason, setDeclineReason] = useState('')
   const [isDeclining, setIsDeclining] = useState(false)
 
+  // Mentions state
+  const [members, setMembers] = useState<any[]>([])
+  const [works, setWorks] = useState<any[]>([])
+  const [selectedPersonMentions, setSelectedPersonMentions] = useState<string[]>([])
+
+  useEffect(() => {
+    if (!showAddForm) return
+    async function loadData() {
+      try {
+        const [memberList, workList] = await Promise.all([getMembers(), getWorks()])
+        setMembers(memberList)
+        setWorks(workList.filter((w: any) => w.status !== 'DELETED' && w.status !== 'ARCHIVED'))
+      } catch (err) {
+        console.error('Failed to load data:', err)
+      }
+    }
+    loadData()
+  }, [showAddForm])
+
   // Delete confirmation
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
@@ -122,10 +143,14 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     setIsSubmitting(true)
     const formData = new FormData(e.currentTarget)
     formData.append('status', 'IDEA')
+    if (selectedPersonMentions.length > 0) {
+      formData.append('personMentions', JSON.stringify(selectedPersonMentions))
+    }
     try {
       const res = await createWork(formData)
       if (res.success) {
         setShowAddForm(false)
+        setSelectedPersonMentions([])
         ;(e.target as HTMLFormElement).reset()
       } else alert(res.error || 'Failed to submit proposal')
     } catch (err) { console.error(err) }
@@ -726,6 +751,51 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                 <textarea name="description" required rows={3} placeholder="Explain the idea, benefits, or workflow in detail..."
                   className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-yellow-500/50 resize-none" />
               </div>
+              
+              {/* Mentions Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-white/5 pt-4 mt-2">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-yellow-500 uppercase tracking-wider">Idea Creators (10 pts)</label>
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-[#0c0d12]/60 border border-white/10 rounded-xl min-h-[38px]">
+                     {members.map(m => (
+                       <button
+                         type="button"
+                         key={m.id}
+                         onClick={() => {
+                           if (selectedPersonMentions.includes(m.id)) {
+                             setSelectedPersonMentions(prev => prev.filter(id => id !== m.id))
+                           } else {
+                             setSelectedPersonMentions(prev => [...prev, m.id])
+                           }
+                         }}
+                         className={`px-2 py-1 text-[9px] rounded-lg border transition-colors cursor-pointer ${
+                           selectedPersonMentions.includes(m.id) 
+                           ? 'bg-purple-500/20 border-purple-500/50 text-purple-400 font-bold' 
+                           : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
+                         }`}
+                       >
+                         {m.name}
+                       </button>
+                     ))}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label htmlFor="parentWorkId" className="text-[10px] font-bold text-yellow-500 uppercase tracking-wider">Parent Work (10 pts)</label>
+                  <select
+                    name="parentWorkId"
+                    className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-yellow-500/50 transition-all"
+                  >
+                    <option value="">None (Standalone)</option>
+                    {works.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div className="flex justify-end gap-2 pt-1">
                 <button type="button" onClick={() => setShowAddForm(false)} className="text-xs bg-white/5 hover:bg-white/10 px-3.5 py-2 rounded-xl text-zinc-400 hover:text-white cursor-pointer font-bold">Cancel</button>
                 <button type="submit" disabled={isSubmitting} className="text-xs bg-yellow-500 text-black hover:bg-yellow-450 px-4 py-2 rounded-xl font-bold disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-md shadow-yellow-500/5">

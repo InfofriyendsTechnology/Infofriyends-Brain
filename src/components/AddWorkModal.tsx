@@ -3,7 +3,7 @@
 import { useStore } from '@/store/useStore'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2, Calendar, User, Shield, AlertTriangle, Plus } from 'lucide-react'
-import { createWork } from '@/app/actions'
+import { createWork, getWorks } from '@/app/actions'
 import { getMembers } from '@/app/actions/admin'
 import { useState, useEffect } from 'react'
 
@@ -12,31 +12,41 @@ export default function AddWorkModal({ user }: { user: any }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [members, setMembers] = useState<any[]>([])
+  const [works, setWorks] = useState<any[]>([])
+  const [selectedPersonMentions, setSelectedPersonMentions] = useState<string[]>([])
 
   useEffect(() => {
     if (!isAddWorkModalOpen) return
-    async function loadMembers() {
+    async function loadData() {
       try {
-        const list = await getMembers()
-        setMembers(list)
+        const [memberList, workList] = await Promise.all([getMembers(), getWorks()])
+        setMembers(memberList)
+        setWorks(workList.filter((w: any) => w.status !== 'DELETED' && w.status !== 'ARCHIVED'))
       } catch (err) {
-        console.error('Failed to load members:', err)
+        console.error('Failed to load data:', err)
       }
     }
-    loadMembers()
+    loadData()
   }, [isAddWorkModalOpen])
 
   if (!isAddWorkModalOpen) return null
 
-  async function handleSubmit(formData: FormData) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
     setIsSubmitting(true)
     setError(null)
     try {
+      const formData = new FormData(e.currentTarget)
+      if (selectedPersonMentions.length > 0) {
+        formData.append('personMentions', JSON.stringify(selectedPersonMentions))
+      }
+
       const res = await createWork(formData)
       if (res && !res.success) {
         setError(res.error || 'Failed to create work.')
       } else {
         setAddWorkModalOpen(false)
+        setSelectedPersonMentions([])
       }
     } catch (err: any) {
       setError(err.message || 'Failed to create work.')
@@ -48,17 +58,16 @@ export default function AddWorkModal({ user }: { user: any }) {
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#09090b]/80 backdrop-blur-md">
-        {/* Modal Backdrop Click Away */}
         <div className="absolute inset-0 cursor-default" onClick={() => setAddWorkModalOpen(false)} />
         
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-lg bg-[#0d0e12]/90 border border-white/10 rounded-3xl shadow-2xl overflow-hidden backdrop-blur-xl z-10"
+          className="relative w-full max-w-lg bg-[#0d0e12]/90 border border-white/10 rounded-3xl shadow-2xl overflow-hidden backdrop-blur-xl z-10 max-h-[90vh] flex flex-col"
         >
           {/* Header */}
-          <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
+          <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5 shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#63BDF2] to-[#3188DA] flex items-center justify-center text-black shadow-lg shrink-0">
                 <Plus size={20} className="stroke-[3.5px]" />
@@ -77,15 +86,14 @@ export default function AddWorkModal({ user }: { user: any }) {
           </div>
 
           {/* Form */}
-          <form action={handleSubmit} className="p-6 space-y-5">
+          <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
             {error && (
-              <div className="p-4 bg-red-500/10 text-red-400 border border-red-500/10 rounded-2xl text-xs flex items-center gap-2">
+              <div className="p-4 bg-red-500/10 text-red-400 border border-red-500/10 rounded-2xl text-xs flex items-center gap-2 shrink-0">
                 <AlertTriangle size={16} />
                 <span>{error}</span>
               </div>
             )}
             
-            {/* Title */}
             <div className="space-y-1.5">
               <label htmlFor="name" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Work Title</label>
               <input
@@ -97,7 +105,6 @@ export default function AddWorkModal({ user }: { user: any }) {
               />
             </div>
 
-            {/* Description */}
             <div className="space-y-1.5">
               <label htmlFor="description" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Short Description</label>
               <textarea
@@ -110,7 +117,6 @@ export default function AddWorkModal({ user }: { user: any }) {
               />
             </div>
 
-            {/* Row: Assignee & Priority */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label htmlFor="assigneeId" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Assign To Member</label>
@@ -144,7 +150,6 @@ export default function AddWorkModal({ user }: { user: any }) {
               </div>
             </div>
 
-            {/* Row: Status & Due Date */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label htmlFor="status" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Initial Status</label>
@@ -176,8 +181,53 @@ export default function AddWorkModal({ user }: { user: any }) {
               </div>
             </div>
 
+            {/* Row: Mentions System */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-white/5 pt-4 mt-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[#63BDF2] uppercase tracking-wider">Idea Creators (10 pts)</label>
+                <div className="flex flex-wrap gap-1.5 p-2 bg-[#0c0d12]/50 border border-[#63BDF2]/20 rounded-xl min-h-[42px]">
+                   {members.map(m => (
+                     <button
+                       type="button"
+                       key={m.id}
+                       onClick={() => {
+                         if (selectedPersonMentions.includes(m.id)) {
+                           setSelectedPersonMentions(prev => prev.filter(id => id !== m.id))
+                         } else {
+                           setSelectedPersonMentions(prev => [...prev, m.id])
+                         }
+                       }}
+                       className={`px-2 py-1 text-[10px] rounded-lg border transition-colors ${
+                         selectedPersonMentions.includes(m.id) 
+                         ? 'bg-purple-500/20 border-purple-500/50 text-purple-400' 
+                         : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
+                       }`}
+                     >
+                       {m.name}
+                     </button>
+                   ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="parentWorkId" className="text-xs font-bold text-[#63BDF2] uppercase tracking-wider">Parent Work (10 pts)</label>
+                <select
+                  id="parentWorkId"
+                  name="parentWorkId"
+                  className="w-full bg-[#0d0e12] border border-[#63BDF2]/20 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#63BDF2]/50 transition-all"
+                >
+                  <option value="">None (Standalone)</option>
+                  {works.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             {/* Footer Actions */}
-            <div className="pt-4 flex items-center justify-between border-t border-white/5">
+            <div className="pt-4 flex items-center justify-between border-t border-white/5 shrink-0 pb-2">
               <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#63BDF2]" />
                 <span>Creating as <strong className="text-white font-bold">{user.name}</strong></span>

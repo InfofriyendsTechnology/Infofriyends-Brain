@@ -28,6 +28,7 @@ model User {
   passwordHash      String
   role              Role     @default(MEMBER)
   profilePhoto      String?
+  totalPoints       Int      @default(0)
   lastActive        DateTime? @default(now())
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -43,9 +44,13 @@ model User {
   chatMessages      ChatMessage[]
   typingStates      TypingState[]
   ideaSupports      IdeaSupport[]
-  workReviews       WorkReview[]
   notes             Note[]
   notifications     Notification[]
+  
+  // Mention & Points System
+  pointsEarned      PointTransaction[]
+  personMentions    PersonMention[]
+  timeLogs          TimeLog[]
 }
 
 model Work {
@@ -75,11 +80,17 @@ model Work {
 
   supports        IdeaSupport[]
 
+  // Mention & Points System
+  parentWorkId    String?
+  parentWork      Work?    @relation("WorkToSubWorks", fields: [parentWorkId], references: [id])
+  subWorks        Work[]   @relation("WorkToSubWorks")
+  personMentions  PersonMention[]
+  timeLogs        TimeLog[]
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   activityLogs    ActivityLog[]
-  reviews         WorkReview[]
 }
 
 model ActivityLog {
@@ -168,22 +179,6 @@ model IdeaSupport {
   @@unique([workId, userId])
 }
 
-model WorkReview {
-  id        String   @id @default(cuid())
-  rating    Int      // 1 to 5 stars
-  feedback  String?  @db.Text
-  
-  workId    String
-  work      Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
-  
-  reviewerId String
-  reviewer   User    @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
-  
-  createdAt DateTime @default(now())
-
-  @@unique([workId, reviewerId])
-}
-
 model Note {
   id          String    @id @default(cuid())
   title       String
@@ -209,4 +204,50 @@ model Notification {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   createdAt   DateTime @default(now())
+}
+
+// ---------------------------------------------------------
+// Mention & Points System Models
+// ---------------------------------------------------------
+
+model PointTransaction {
+  id        String   @id @default(cuid())
+  amount    Int
+  reason    String   // "PERSON_MENTION", "WORK_MENTION", "TIME_LOG"
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  workId    String?  // Optional reference to which work granted the points
+  
+  createdAt DateTime @default(now())
+}
+
+model PersonMention {
+  id        String   @id @default(cuid())
+  
+  workId    String
+  work      Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  pointsAwarded Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([workId, userId])
+}
+
+model TimeLog {
+  id        String   @id @default(cuid())
+  hours     Int
+  points    Int
+  
+  workId    String
+  work      Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
 }

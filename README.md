@@ -1,163 +1,158 @@
-# Infofriyends Brain OS 🧠
+# 🧠 Infofriyends Brain OS
 
-Welcome to **Infofriyends Brain OS** — a high-fidelity, ultra-responsive asynchronous team operating system and collaborative startup workflow suite. 
-
-This platform is custom-built with premium dark glassmorphism, hardware-accelerated animations, live-synchronized collaboration tools, and gamified contribution leaderboards to power modern team execution.
+Welcome to **Infofriyends Brain OS** — a hyper-customized, ultra-premium dark-glassmorphic team workspace, asynchronous operating system, and collaborative startup pipeline. Built specifically for next-gen high-efficiency startup execution.
 
 ---
 
-## 🗺️ System Architecture & Workflow Flowcharts
+## 📺 Immersive Gallery & Interface Mockups
 
-### 1. Unified Application Architecture
-The diagram below illustrates the asynchronous state synchronization, server-side data layer, and component routing pipeline:
+Observe the premium dark-glassmorphism, vibrant soft-blue/cyan glows, and modern layouts captured from the live application:
+
+### 1. 📢 Dynamic Dashboard & Community Feed (`/`)
+*Live company updates, team standing leaderboard, and asynchronous broadcast logs.*
+<img src="/screenshots/home_dashboard_1779189696596.png" width="100%" alt="Dashboard" style="border-radius:16px; border: 1px solid rgba(255,255,255,0.08); margin: 12px 0 24px;" />
+
+### 2. 💼 Asynchronous Workspace Pipeline (`/works`)
+*Visual kanban workspace showing startup assignments, custom status filters, and active card blocks.*
+<img src="/screenshots/works_page_1779189719785.png" width="100%" alt="Workspace Pipeline" style="border-radius:16px; border: 1px solid rgba(255,255,255,0.08); margin: 12px 0 24px;" />
+
+### 3. 💬 Asynchronous Team Chat Lounge (`/chat`)
+*Realtime group channels with active typing indicators and collapsing mobile canvas drawers.*
+<img src="/screenshots/chat_page_1779189755665.png" width="100%" alt="Team Chat Lounge" style="border-radius:16px; border: 1px solid rgba(255,255,255,0.08); margin: 12px 0 24px;" />
+
+### 4. 🔑 Standing Scorecard & Credentials (`/profile`)
+*Personal scorecards rendering aggregate review counts, active ranks, and published item logs.*
+<img src="/screenshots/profile_settings_page_1779189791979.png" width="100%" alt="Profile Scorecard" style="border-radius:16px; border: 1px solid rgba(255,255,255,0.08); margin: 12px 0 24px;" />
+
+### 5. 🛡️ Command Center & Member Management (`/admin`)
+*Complete administrative controls: assign roles, create new members, and edit permissions safely.*
+<img src="/screenshots/admin_page_1779189814770.png" width="100%" alt="Admin Command Center" style="border-radius:16px; border: 1px solid rgba(255,255,255,0.08); margin: 12px 0 24px;" />
+
+---
+
+## 🗺️ System Architecture & Workflow State Engines
+
+### 1. Unified Application Architecture Pipeline
+Our architectural flow maps asynchronous client states, global client state stores, server actions, and relational database migrations:
 
 ```mermaid
 graph TD
-    A[Client Browser] -->|HTTP Requests / Actions| B[Next.js App Router Server]
-    A -->|3.5s Sync Loop| C[Realtime Polling Engine]
-    C -->|Read-Only Statuses| B
-    B -->|Prisma Client| D[SQLite Database]
-    E[Zustand State Store] -->|Controls UI state| A
-    E -->|Navbar visibility & Modals| A
+    A[Client User Interface] -->|1. Next.js Server Actions| B[App Router Action Gate]
+    A -->|2. Web Audio Synthesizer| C[HTML5 Audio Context]
+    A -->|3. Zustand State Store| D[Global UI Context]
+    B -->|4. Safe Prisma Client| E[PostgreSQL Database]
+    F[Live Clock Polling Engine] -->|5. Recurrent Alarms Scanning| E
+    
     style A fill:#0e2038,stroke:#63BDF2,stroke-width:2px,color:#fff
-    style B fill:#18181b,stroke:#3188DA,stroke-width:2px,color:#fff
-    style C fill:#09090b,stroke:#a1a1aa,stroke-width:2px,color:#fff
-    style D fill:#0d0e12,stroke:#3188DA,stroke-width:2px,color:#fff
-    style E fill:#0e2038,stroke:#63BDF2,stroke-width:2px,color:#fff
+    style B fill:#18181b,stroke:#3188DA,stroke-width:1px,color:#fff
+    style C fill:#18181b,stroke:#a1a1aa,stroke-width:1px,color:#fff
+    style D fill:#18181b,stroke:#3188DA,stroke-width:1px,color:#fff
+    style E fill:#09090b,stroke:#63BDF2,stroke-width:2px,color:#fff
+    style F fill:#0e2038,stroke:#63BDF2,stroke-width:1px,color:#fff
 ```
 
-### 2. Work Assignment Status Lifecycle
-Tracks active products, handles blocker alerts, and compiles activity logs for team visibility:
+### 2. Relational Database Schema Design
+We run on a multi-relational **PostgreSQL schema** optimized for private scopes, cascades, and data-integrity protections:
 
 ```mermaid
-graph LR
-    IDEA[💡 IDEA] -->|Start Active| ACTIVE[⚡ ACTIVE]
-    ACTIVE -->|Encounter Issue| BLOCKED[⚠️ BLOCKED]
-    BLOCKED -->|Resolve Blocker| ACTIVE
-    ACTIVE -->|Deliver Task| COMPLETED[✅ COMPLETED]
-    COMPLETED -->|Archive Board| ARCHIVED[📦 ARCHIVED]
+erDiagram
+    USER ||--o{ WORK : creates
+    USER ||--o{ WORK : assigned_to
+    USER ||--o{ NOTE : manages
+    USER ||--o{ NOTIFICATION : receives
+    WORK ||--o{ WORK_UPDATE : logs
+    WORK ||--o{ WORK_REVIEW : rates
     
-    style IDEA fill:#8b5cf6,stroke:#a78bfa,color:#fff
-    style ACTIVE fill:#3b82f6,stroke:#60a5fa,color:#fff
-    style BLOCKED fill:#ef4444,stroke:#f87171,color:#fff
-    style COMPLETED fill:#10b981,stroke:#34d399,color:#fff
-    style ARCHIVED fill:#71717a,stroke:#a1a1aa,color:#fff
+    USER {
+        string id PK
+        string username UNIQUE
+        string role "ADMIN | MEMBER"
+        string passwordHash
+    }
+    WORK {
+        string id PK
+        string status "IDEA | ACTIVE | BLOCKED | COMPLETED | ARCHIVED"
+        string priority "LOW | MEDIUM | HIGH | URGENT"
+        string assigneeId FK
+    }
+    NOTE {
+        string id PK
+        string title
+        string color
+        datetime reminderAt
+        string userId FK
+    }
+    NOTIFICATION {
+        string id PK
+        string title
+        string type "INFO | REMINDER | WARNING | BLOCKER"
+        boolean isRead
+        string userId FK
+    }
 ```
 
 ---
 
-## 📺 Application Walkthrough & Visual Showcase
+## 💎 Breathtaking Premium Features Implemented Today
 
-Here is a visual gallery of the main workspace centers captured directly from the running OS:
+### 1. 📖 Emoji-Free Contextual Handbook (`HelpGuideModal.tsx`)
+- **Interactive Guides**: Toggled via a floating `(?)` question-mark icon present on all pages. Displays detailed, contextual explanations (e.g. Workspace card pipelines, consensus voting, user onboarding).
+- **Staggered Animations**: Built with Framer Motion spring dynamics and sliding active tab backlights (`layoutId="activeTabGlow"`).
+- **Authorship Compliance**: Strictly signed and attributed to the **Infofriyends Technology Team** — completely free of placeholder titles.
 
-### 1. 📢 Super Admin Dashboard & Community Feed (`/`)
-*Dynamic contribution standing leaderboards, broadcast logs, and startup-wide announcement board.*
-![Super Admin Dashboard](docs/screenshots/dashboard.png)
+### 2. 📂 Sliding Personal Notes Canvas Drawer (`NotesDrawer.tsx`)
+- **Note Grid**: Slide-out glassmorphic panel powered by Framer Motion. Allows users to write quick thoughts, task lists, or markdown snippets.
+- **Color Label Coding**: Organise note cards with custom neon colors (Cyan `#63BDF2`, Soft Emerald, Gold, Crimson, Rose, and Carbon).
+- **Date & Time Reminders**: Configure calendar-based datetime triggers mapped to specific database notes.
 
-### 2. 💼 Realtime Work Wall Pipeline & Filters (`/works`)
-*Comprehensive async dashboard showing active startup assignments, custom dropdown filters, and status controls.*
-![Work Board Pipeline](docs/screenshots/workwall.png)
+### 3. 🔔 Real-Time Inbox Dropdown (`NotificationsDropdown.tsx`)
+- **Status Indicator**: Elegant top bell utility with unread alarm count indicators.
+- **Dynamic Scanners**: Polls serverside actions to sync notifications, blocker alerts, and reminder alarms in real-time.
 
-### 3. 💬 Asynchronous Team Chat & Lounge (`/chat`)
-*Live chat channels with typing notifications, mobile sliding drawer sidebar, and dynamic content streams.*
-![Live Lounge Chat](docs/screenshots/chat.png)
-
-### 4. 🔑 Profile Settings & Shipped Works (`/profile`)
-*Personal scorecards showing current rank status, active workspace credentials, and public work request history.*
-![Profile Settings Panel](docs/screenshots/profile.png)
-
-### 5. 🛡️ Administrative Command Center (`/admin`)
-*Full user controls: assign roles, add/edit team members, reset scores, and toggle dashboard permissions.*
-![Admin Command Center](docs/screenshots/admin.png)
-
-### 6. 📝 Initiate Work Form Modal
-*Premium dialog layout for launching assignments across channels with title, assignee, status, and priority inputs.*
-![Initiate Work Form Modal](docs/screenshots/form.png)
-
-### 7. 🛑 Block Work Dialogue Box
-*Card-relative dialog for providing blocker context, updating the task status, and posting warning indicators.*
-![Block Work Dialog](docs/screenshots/block_dialog.png)
+### 4. 🎹 Synthesized Cyber Audio Alarms Engine
+- **Browser-Native Sound Engine**: Upon scheduled note reminder completion, the OS programmatically triggers a highly pristine, futuristic electronic cyber-arpeggio synthesized directly via the HTML5 **Web Audio API** (avoiding static sound file loading errors).
+- **Visual Warning Banners**: Slide-down warning indicators show note details, logging an automatic unread warning inside the notification bell feed.
 
 ---
 
-## 🛠️ Technology Stack & Engine Specs
+## 🛠️ Technological Specifications & Stack
 
-| Technology | Layer | Purpose |
+| Technology | Layer | Implementation Purpose |
 | :--- | :--- | :--- |
-| **Next.js 15+** | Framework | App Router, Server Actions, Server-Side Rendering (SSR), and Streaming. |
-| **React 19** | Library | High-performance client components, Suspense states, and reactive inputs. |
-| **Prisma ORM** | Data Layer | Schema migrations, client generation, and type-safe relational model queries. |
-| **SQLite** | Database | Fast local file-based database for project standalone environments. |
-| **Zustand** | State Store | Global UI context management (e.g. navbar drawer state, modal visibility). |
+| **Next.js 15+** | Framework | App Router, Server Actions, Server-Side Rendering (SSR). |
+| **React 19** | Library | Dynamic client components, Suspense states, and reactive contexts. |
+| **Prisma ORM** | Data Layer | Type-safe schema generation, relational model queries, and migrations. |
+| **PostgreSQL** | Database | Live hosted Supabase relational instance with connection poolers. |
+| **Zustand** | State Store | Lightweight, fast client state engine for UI controls. |
 | **Framer Motion** | Animation | Fluid, hardware-accelerated drawer slides, modal transitions, and load cycles. |
-| **TailwindCSS v4** | Styling | Utility tokens configured with custom variables (Cyan `#63BDF2`, Blue `#3188DA`). |
-| **Lucide React** | Icons | SVG vector illustration system for buttons, labels, and badges. |
+| **TailwindCSS v4** | Styling | Premium theme tokens with custom color variables. |
+| **Lucide React** | Icons | Breathtaking, high-fidelity SVG icon system. |
 
 ---
 
-## 🌟 Detailed Feature Architecture
+## 🚀 Setup & Launch Checklist
 
-### 1. Work Assignment Form & Modal
-* **Create Work Sheet:** Accessed via header buttons or floating screen icons. Enables creation of work requests with custom configurations.
-* **Fields Indexed:**
-  * **Work Title:** Concise identifier of the startup assignment.
-  * **Short Description:** Full details of deliverables, tasks, and requirements.
-  * **Assign to Member:** Dynamic search menu of registered workspace members.
-  * **Priority Level:** Classified into `LOW`, `MEDIUM`, `HIGH`, or `URGENT` tiers.
-  * **Initial Status:** Selectable to boot immediately into a pipeline lifecycle state.
-  * **Due Date:** Optional calendar picker specifying target delivery windows.
-
-### 2. Work Status System & Badges
-Tasks transition through designated lifecycle gates, each displaying responsive custom badge overlays:
-* **`IDEA` (Purple):** Abstract tasks or proposed solutions waiting for planning greenlight.
-* **`ACTIVE` (Blue):** Actively developed items assigned to a member.
-* **`BLOCKED` (Red):** Stalled assignments requiring immediate coordination.
-* **`COMPLETED` (Green):** Completed items showing total contribution rewards.
-* **`ARCHIVED` (Zinc):** Historic deliverables stored for team compliance checks.
-
-### 3. Personal Focus Area
-* **My Focus tab:** Displays works assigned to the logged-in member.
-* **Unresolved Creator Items:** Displays unresolved `IDEA`, `ACTIVE`, and `BLOCKED` cards created by the user, providing a single consolidated dashboard for daily focus.
-
-### 4. Interactive Blocker Banners
-* **Blocked Dialog:** Clicking "Block Work" triggers a reasons modal.
-* **Warning Banners:** Once blocked, the reason is prominently rendered inside a red alert box at the top of the card. A system-wide admin notice is triggered when any item remains blocked.
-
-### 5. Timeline Updates & Audit Log
-* **Progress Streams:** Write custom logs or click suggestion chips ("UI completed", "Waiting for API", "Client replied") to post timeline notes.
-* **Activity Logs:** All actions (creation, status modifications, points adjustments) are saved as permanent system logs rendered on card backfaces.
-
-### 6. Mobile Responsiveness Optimization
-* **5-Item Fixed Bar:** Screen navigation shrinks to five key icons on mobile viewports.
-* **Dynamic Drawer Menu:** Additional channels slide up inside a "More" drawer context overlay.
-* **Hideable Navbar Switch:** Allows hiding the navigation bar. Restoring it is made simple with a floating bottom corner toggle button.
-* **Overlap Protection:** Margin properties automatically transition when the navbar is hidden or shown to prevent content overlaps with inputs.
-
----
-
-## ⚙️ Quick Start & Setup
-
-### 1. Installation
-Clone the repository and install dependency nodes:
+### 1. Project Initialization
 ```bash
 npm install
 ```
 
-### 2. Database Initialization
-Generate local Prisma client instances and apply DB schema structures:
+### 2. Database Integration
+Ensure database environment variables (`DATABASE_URL`, `DIRECT_URL`) are configured in `.env`.
+Generate client structures and sync the schema to your hosted PostgreSQL database:
 ```bash
 npx prisma generate
 npx prisma db push
 ```
 
-### 3. Launch Development Server
+### 3. Run Development Environment
 ```bash
 npm run dev
 ```
-Open [http://localhost:17526](http://localhost:17526) in your browser.
+Navigate to [http://localhost:17526].
 
-### 4. Production Build Verification
-Verify production compiles clean of lint and types issues:
+### 4. Build Verification
+Confirm the bundle builds cleanly with zero TypeScript or linting errors:
 ```bash
 npm run build
 ```

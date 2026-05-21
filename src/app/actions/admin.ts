@@ -56,14 +56,10 @@ export async function getMembers() {
             id: true,
             name: true,
             status: true,
-            createdAt: true,
-            reviews: {
-              select: {
-                rating: true
-              }
-            }
+            createdAt: true
           }
-        }
+        },
+        totalPoints: true
       },
       orderBy: { createdAt: 'desc' }
     })
@@ -71,23 +67,11 @@ export async function getMembers() {
     // Calculate dynamic contributionScore based on completed works and average rating
     const parsedData = JSON.parse(JSON.stringify(data)).map((user: any) => {
       const completedWorks = user.worksCreated.filter((w: any) => w.status === 'COMPLETED' || w.status === 'ARCHIVED')
-      let totalStars = 0
-      let totalReviews = 0
       
-      completedWorks.forEach((w: any) => {
-        w.reviews?.forEach((r: any) => {
-          totalStars += r.rating
-          totalReviews++
-        })
-      })
-      
-      const averageRating = totalReviews > 0 ? totalStars / totalReviews : 0
-      // Calculate a score: 1 completed work with 5 stars = 50 points, etc. 
-      // Or just return averageRating and let UI handle it. 
-      // We will add averageRating and completedWorksCount, and keep contributionScore for backward compatibility 
-      user.averageRating = averageRating
+      user.averageRating = 0
       user.completedWorksCount = completedWorks.length
-      user.contributionScore = Math.round(completedWorks.length * averageRating * 10)
+      user.contributionScore = user.totalPoints // Direct mapping to the new point system
+
       
       return user
     })
