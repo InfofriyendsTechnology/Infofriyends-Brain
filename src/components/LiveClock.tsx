@@ -2,19 +2,18 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Globe, Clock } from 'lucide-react'
 
-// Timezone definitions with country flag and label
+// Flag image URLs from flagcdn.com (always works on Windows desktop)
 const TIMEZONES = [
-  { id: 'IST', label: 'India (IST)', flag: '🇮🇳', tz: 'Asia/Kolkata' },
-  { id: 'EST', label: 'USA (EST)', flag: '🇺🇸', tz: 'America/New_York' },
-  { id: 'GMT', label: 'UK (GMT)', flag: '🇬🇧', tz: 'Europe/London' },
-  { id: 'JST', label: 'Japan (JST)', flag: '🇯🇵', tz: 'Asia/Tokyo' },
+  { id: 'IST', label: 'India (IST)', flagUrl: 'https://flagcdn.com/w20/in.png', tz: 'Asia/Kolkata' },
+  { id: 'EST', label: 'USA (EST)',   flagUrl: 'https://flagcdn.com/w20/us.png', tz: 'America/New_York' },
+  { id: 'GMT', label: 'UK (GMT)',    flagUrl: 'https://flagcdn.com/w20/gb.png', tz: 'Europe/London' },
+  { id: 'JST', label: 'Japan (JST)',flagUrl: 'https://flagcdn.com/w20/jp.png', tz: 'Asia/Tokyo' },
 ]
 
 export default function LiveClock() {
   const [mounted, setMounted] = useState(false)
-  const [selectedTz, setSelectedTz] = useState(TIMEZONES[0]) // Default is India (IST)
+  const [selectedTz, setSelectedTz] = useState(TIMEZONES[0])
   const [timeStr, setTimeStr] = useState('')
   const [dateStr, setDateStr] = useState('')
   const [dayProgress, setDayProgress] = useState(0)
@@ -22,12 +21,10 @@ export default function LiveClock() {
 
   useEffect(() => {
     setMounted(true)
-    
+
     const updateClock = () => {
       const now = new Date()
-      
       try {
-        // Time string with running seconds: e.g. "09:16:34 PM"
         const formattedTime = now.toLocaleTimeString('en-US', {
           timeZone: selectedTz.tz,
           hour: '2-digit',
@@ -36,7 +33,6 @@ export default function LiveClock() {
           hour12: true
         })
 
-        // Date string: e.g. "SUN, MAY 17"
         const formattedDate = now.toLocaleDateString('en-US', {
           timeZone: selectedTz.tz,
           weekday: 'short',
@@ -44,8 +40,6 @@ export default function LiveClock() {
           day: 'numeric'
         }).toUpperCase()
 
-        // Calculate day progress in the selected timezone
-        // Convert local parts of selected timezone
         const formatterParts = new Intl.DateTimeFormat('en-US', {
           timeZone: selectedTz.tz,
           hour: '2-digit',
@@ -54,20 +48,18 @@ export default function LiveClock() {
           hour12: false
         })
         const parts = formatterParts.formatToParts(now)
-        
-        const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10)
+        const hour   = parseInt(parts.find(p => p.type === 'hour')?.value   || '0', 10)
         const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10)
         const second = parseInt(parts.find(p => p.type === 'second')?.value || '0', 10)
 
-        const totalSecondsInDay = 24 * 60 * 60
-        const elapsedSeconds = (hour * 3600) + (minute * 60) + second
-        const progress = (elapsedSeconds / totalSecondsInDay) * 100
+        const elapsedSeconds = hour * 3600 + minute * 60 + second
+        const progress = (elapsedSeconds / 86400) * 100
 
         setTimeStr(formattedTime)
         setDateStr(formattedDate)
         setDayProgress(progress)
       } catch (e) {
-        console.error('Failed to format timezone clock:', e)
+        console.error('Clock error:', e)
       }
     }
 
@@ -83,7 +75,7 @@ export default function LiveClock() {
           --:--:-- --
         </span>
         <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest block mt-1.5">
-          LOADING SYSTEMS...
+          LOADING...
         </span>
       </div>
     )
@@ -91,7 +83,8 @@ export default function LiveClock() {
 
   return (
     <div className="flex flex-col items-end gap-1.5 select-none relative z-30">
-      {/* Timezone switcher with country flags (છબીઓ) */}
+
+      {/* Timezone Flag Switcher */}
       <div className="flex items-center gap-1 bg-white/5 border border-white/5 p-0.5 rounded-lg">
         {TIMEZONES.map(tz => (
           <button
@@ -104,19 +97,27 @@ export default function LiveClock() {
                 : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5 border border-transparent'
             }`}
           >
-            <span className="text-xs leading-none">{tz.flag}</span>
+            {/* Flag image — always renders on Windows desktop */}
+            <img
+              src={tz.flagUrl}
+              alt={tz.id}
+              width={16}
+              height={12}
+              className="rounded-sm object-cover shrink-0"
+              style={{ imageRendering: 'auto' }}
+            />
             <span className="font-mono">{tz.id}</span>
           </button>
         ))}
       </div>
 
-      {/* Main Glassmorphic Clock Card */}
-      <div 
+      {/* Clock Card */}
+      <div
         className="bg-zinc-950/45 border border-white/5 hover:border-[#63BDF2]/20 p-3 rounded-2xl transition-all cursor-help relative shadow-xl backdrop-blur-md"
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
       >
-        {/* Time with Running Seconds and AM/PM */}
+        {/* Time HH:MM:SS + AM/PM */}
         <div className="flex items-baseline justify-end gap-1 font-mono">
           <span className="text-2xl md:text-3xl font-black text-white tracking-tight leading-none">
             {timeStr.split(' ')[0]}
@@ -126,38 +127,25 @@ export default function LiveClock() {
           </span>
         </div>
 
-        {/* Date & Circular Progress Shell (જીવન શેલકેક) */}
+        {/* Date + Day Progress Ring */}
         <div className="flex items-center justify-end gap-2 mt-2">
-          {/* Date */}
           <span className="text-[9px] text-zinc-500 font-mono tracking-wider">
             {dateStr}
           </span>
-          
           <div className="h-2.5 w-px bg-white/10" />
-
-          {/* SVG Circular Day Progress ring (જીવન શેલકેક) */}
-          <div 
+          <div
             className="flex items-center gap-1"
             title={`Day Progress: ${dayProgress.toFixed(2)}% elapsed`}
           >
-            <svg className="w-3.5 h-3.5 transform -rotate-90">
-              <circle 
-                cx="7" 
-                cy="7" 
-                r="5" 
-                className="stroke-white/5" 
-                strokeWidth="1.5" 
-                fill="transparent" 
-              />
-              <circle 
-                cx="7" 
-                cy="7" 
-                r="5" 
-                className="stroke-emerald-500" 
-                strokeWidth="1.5" 
+            <svg className="w-3.5 h-3.5 -rotate-90">
+              <circle cx="7" cy="7" r="5" className="stroke-white/5" strokeWidth="1.5" fill="transparent" />
+              <circle
+                cx="7" cy="7" r="5"
+                className="stroke-emerald-500"
+                strokeWidth="1.5"
                 fill="transparent"
                 strokeDasharray={2 * Math.PI * 5}
-                strokeDashoffset={2 * Math.PI * 5 * (1 - dayProgress / 100)} 
+                strokeDashoffset={2 * Math.PI * 5 * (1 - dayProgress / 100)}
               />
             </svg>
             <span className="text-[9px] text-emerald-400 font-mono font-bold">
@@ -166,7 +154,7 @@ export default function LiveClock() {
           </div>
         </div>
 
-        {/* Ultra-Premium Gujarati Humorous Tooltip */}
+        {/* Gujarati Motivational Tooltip */}
         <AnimatePresence>
           {showTooltip && (
             <motion.div
