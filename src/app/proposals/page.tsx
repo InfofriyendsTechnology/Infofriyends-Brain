@@ -14,7 +14,7 @@ async function ProposalsSection({ session }: { session: any }) {
   try {
     ideas = await getIdeasWithSupports()
     const members = await getMembers()
-    membersCount = members.length
+    membersCount = members.filter((m: any) => m.role !== 'ADMIN').length
   } catch (error) {}
 
   return (
