@@ -22,6 +22,7 @@ async function MemberActivitySection() {
       members={members} 
       works={works} 
       currentUserId={session?.user?.id} 
+      currentUserRole={session?.user?.role}
     />
   )
 }

@@ -3,6 +3,38 @@
 import prisma from '@/lib/prisma'
 import { hashPassword } from '@/lib/password'
 import { revalidatePath } from 'next/cache'
+import { getSession, impersonate } from '@/lib/auth'
+
+export async function impersonateMemberAction(targetUserId: string) {
+  const session = await getSession()
+  if (!session || session.user.role !== 'ADMIN') return { success: false, error: 'Unauthorized' }
+
+  try {
+    const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } })
+    if (!targetUser) return { success: false, error: 'User not found' }
+    
+    // Save minimal data to session
+    const targetUserPayload = {
+      id: targetUser.id,
+      role: targetUser.role,
+      name: targetUser.name,
+      username: targetUser.username
+    }
+    
+    await impersonate(targetUserPayload, session.user)
+    revalidatePath('/')
+    return { success: true }
+  } catch (e: any) {
+    return { success: false, error: e.message }
+  }
+}
+
+export async function revertImpersonationAction() {
+  const { revertImpersonation } = await import('@/lib/auth')
+  const success = await revertImpersonation()
+  if (success) revalidatePath('/')
+  return { success }
+}
 
 export async function createMember(formData: FormData) {
   const name = formData.get('name') as string

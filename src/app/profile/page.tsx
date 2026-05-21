@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import prisma from '@/lib/prisma'
 import ProfileForm from '@/components/ProfileForm'
 import WorkCard from '@/components/WorkCard'
+import EnvironmentLinks from '@/components/EnvironmentLinks'
 import { User, Award, Flame, FolderGit2 } from 'lucide-react'
 import { Suspense } from 'react'
 
@@ -256,6 +257,8 @@ export default async function ProfilePage() {
               <ScorecardSection session={session} />
             </Suspense>
           </div>
+
+          <EnvironmentLinks />
         </div>
       </div>
     </div>

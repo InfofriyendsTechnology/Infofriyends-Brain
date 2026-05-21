@@ -167,7 +167,7 @@ export default function LiveClock() {
               <div className="flex gap-2">
                 <span className="text-amber-400 text-lg select-none">💡</span>
                 <p className="text-[11px] text-zinc-300 font-bold leading-normal font-sans">
-                  "કોઈપણ એક વિચાર ઉમેરવો તો જ કામનું છે. નકર કંપનીને તમારાથી બેસવાથી કંઈ ફાયદો થવાનો નથી."
+                  "Consistently adding valuable ideas is essential. Passive observation does not contribute to the company's growth."
                 </p>
               </div>
               <div className="absolute right-6 top-full w-2.5 h-2.5 bg-zinc-950 border-r border-b border-amber-500/20 transform rotate-45 -translate-y-1.5" />

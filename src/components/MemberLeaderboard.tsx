@@ -23,7 +23,7 @@ export default function MemberLeaderboard({ members, limit }: MemberLeaderboardP
           <h2 className="text-lg font-bold text-white tracking-tight">Founder Board</h2>
           <SectionGuide 
             title="Founder Board"
-            content="Ranks members based on their actual performance. Ranking is determined dynamically by the number of completed works and the average 5-star peer reviews received."
+            content="Ranks members based on their actual performance. Ranking is determined dynamically by their total points and the number of completed works."
           />
         </div>
         <div className="flex items-center gap-1 text-[10px] text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full font-semibold uppercase">
@@ -81,9 +81,9 @@ export default function MemberLeaderboard({ members, limit }: MemberLeaderboardP
 
               <div className="flex items-center gap-3 shrink-0">
                 <div className="text-right">
-                  <div className="flex items-center gap-1 justify-end text-amber-400 mb-0.5">
-                    <span className="text-sm font-black leading-none">{Number(member.averageRating || 0).toFixed(1)}</span>
-                    <span className="text-[10px]">⭐</span>
+                  <div className="flex items-center gap-1 justify-end text-emerald-400 mb-0.5">
+                    <span className="text-sm font-black leading-none">{member.contributionScore || 0}</span>
+                    <span className="text-[10px] uppercase font-bold">Pts</span>
                   </div>
                   <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">{member.completedWorksCount || 0} Works</span>
                 </div>

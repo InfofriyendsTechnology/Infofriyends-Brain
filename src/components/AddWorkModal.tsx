@@ -126,7 +126,7 @@ export default function AddWorkModal({ user }: { user: any }) {
                   className="w-full bg-[#0d0e12] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#63BDF2]/50 transition-all"
                 >
                   <option value="">Unassigned</option>
-                  {members.map((m) => (
+                  {members.filter(m => m.role !== 'ADMIN').map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name} ({m.role})
                     </option>
@@ -186,7 +186,7 @@ export default function AddWorkModal({ user }: { user: any }) {
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-[#63BDF2] uppercase tracking-wider">Idea Creators (10 pts)</label>
                 <div className="flex flex-wrap gap-1.5 p-2 bg-[#0c0d12]/50 border border-[#63BDF2]/20 rounded-xl min-h-[42px]">
-                   {members.map(m => (
+                   {members.filter(m => m.role !== 'ADMIN').map(m => (
                      <button
                        type="button"
                        key={m.id}

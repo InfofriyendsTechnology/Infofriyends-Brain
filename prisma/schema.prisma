@@ -17,6 +17,7 @@ datasource db {
 enum Role {
   ADMIN
   MEMBER
+  NEUTRAL
 }
 
 model User {
@@ -46,6 +47,9 @@ model User {
   ideaSupports      IdeaSupport[]
   notes             Note[]
   notifications     Notification[]
+  
+  ideaDisagrees     IdeaDisagree[]
+  disagreeReplies   IdeaDisagreeReply[]
   
   // Mention & Points System
   pointsEarned      PointTransaction[]
@@ -79,6 +83,7 @@ model Work {
   editReason      String?  @db.Text
 
   supports        IdeaSupport[]
+  disagrees       IdeaDisagree[]
 
   // Mention & Points System
   parentWorkId    String?
@@ -177,6 +182,30 @@ model IdeaSupport {
   createdAt DateTime @default(now())
 
   @@unique([workId, userId])
+}
+
+model IdeaDisagree {
+  id        String   @id @default(cuid())
+  reason    String   @db.Text
+  workId    String
+  work      Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  replies   IdeaDisagreeReply[]
+  
+  @@unique([workId, userId])
+}
+
+model IdeaDisagreeReply {
+  id          String   @id @default(cuid())
+  content     String   @db.Text
+  disagreeId  String
+  disagree    IdeaDisagree @relation(fields: [disagreeId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
 }
 
 model Note {

@@ -15,6 +15,7 @@ async function logActivity(action: string, userId: string, workId?: string, deta
 export async function createWork(formData: FormData) {
   const session = await getSession()
   if (!session) return { success: false, error: 'Unauthorized' }
+  if (session.user.role === 'ADMIN') return { success: false, error: 'Admins cannot participate in ideas' }
   const user = session.user
 
   const name = formData.get('name') as string
@@ -316,9 +317,11 @@ export async function logWorkTime(workId: string, hours: number) {
     
     // Calculate points (1h=1pt, 2h=2pt, 4h=5pt)
     let points = 0;
-    if (hours >= 4) points = 5;
-    else if (hours >= 2) points = 2;
-    else if (hours >= 1) points = 1;
+    if (user.role !== 'NEUTRAL') {
+      if (hours >= 4) points = 5;
+      else if (hours >= 2) points = 2;
+      else if (hours >= 1) points = 1;
+    }
     
     if (points > 0) {
       await prisma.timeLog.create({
@@ -414,6 +417,18 @@ export async function getIdeasWithSupports() {
           },
           orderBy: { createdAt: 'desc' }
         },
+        disagrees: {
+          include: {
+            user: { select: { id: true, name: true, profilePhoto: true, role: true } },
+            replies: {
+              include: {
+                user: { select: { id: true, name: true, profilePhoto: true, role: true } }
+              },
+              orderBy: { createdAt: 'asc' }
+            }
+          },
+          orderBy: { createdAt: 'desc' }
+        },
         activityLogs: {
           include: {
             user: { select: { id: true, name: true, profilePhoto: true, role: true } }
@@ -446,8 +461,11 @@ export async function queueIdea(workId: string) {
     const isAuthorized = user.role === 'ADMIN' || work.creatorId === user.id
     if (!isAuthorized) return { success: false, error: 'Not authorized' }
 
-    // Toggle between IDEA and QUEUED
-    const newStatus = work.status === 'QUEUED' ? 'IDEA' : 'QUEUED'
+    if (work.status === 'QUEUED') {
+      return { success: false, error: 'This proposal is already in the execution queue.' }
+    }
+
+    const newStatus = 'QUEUED'
     
     await prisma.work.update({
       where: { id: workId },
@@ -455,12 +473,10 @@ export async function queueIdea(workId: string) {
     })
 
     await logActivity(
-      newStatus === 'QUEUED' ? 'QUEUED_IDEA' : 'UNQUEUED_IDEA',
+      'QUEUED_IDEA',
       user.id,
       workId,
-      newStatus === 'QUEUED'
-        ? `Moved proposal "${work.name}" to execution queue — ready for work`
-        : `Removed proposal "${work.name}" from queue — back to open ideas`
+      `Moved proposal "${work.name}" to execution queue — ready for work`
     )
 
     revalidatePath('/')
@@ -475,7 +491,9 @@ export async function queueIdea(workId: string) {
 export async function toggleIdeaSupport(workId: string) {
   const session = await getSession()
   if (!session) return { success: false, error: 'Unauthorized' }
-  const userId = session.user.id
+  const user = session.user
+  if (user.role === 'ADMIN') return { success: false, error: 'Admins cannot vote on ideas' }
+  const userId = user.id
 
   try {
     const existing = await prisma.ideaSupport.findUnique({
@@ -490,12 +508,16 @@ export async function toggleIdeaSupport(workId: string) {
           workId_userId: { workId, userId }
         }
       })
-      await logActivity('REMOVE_IDEA_SUPPORT', userId, workId, `Removed agreement/support for Idea: ${workId}`)
+      await logActivity('REMOVE_IDEA_SUPPORT', userId, workId, `Removed agreement/support for this Idea.`)
     } else {
       await prisma.ideaSupport.create({
         data: { workId, userId }
       })
-      await logActivity('ADD_IDEA_SUPPORT', userId, workId, `Voted AGREE/SUPPORT for Idea: ${workId}`)
+      // If agreed, remove disagree if exists
+      await prisma.ideaDisagree.deleteMany({
+        where: { workId, userId }
+      })
+      await logActivity('ADD_IDEA_SUPPORT', userId, workId, `Voted AGREE/SUPPORT for this Idea.`)
     }
 
     revalidatePath('/')
@@ -647,5 +669,98 @@ export async function deleteIdea(workId: string) {
   } catch (error: any) {
     console.error('Failed to delete idea:', error)
     return { success: false, error: `Database error: ${error.message || error}` }
+  }
+}
+
+export async function disagreeWithIdea(workId: string, reason: string) {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Unauthorized' }
+  const user = session.user
+  if (user.role === 'ADMIN') return { success: false, error: 'Admins cannot vote on ideas' }
+  const userId = user.id
+
+  if (!reason || !reason.trim()) return { success: false, error: 'Reason is required' }
+
+  try {
+    const work = await prisma.work.findUnique({ where: { id: workId } })
+    if (!work) return { success: false, error: 'Work not found' }
+
+    // If they already agreed, remove their agreement
+    await prisma.ideaSupport.deleteMany({
+      where: { workId, userId }
+    })
+
+    // Upsert disagree
+    const disagree = await prisma.ideaDisagree.findUnique({
+      where: { workId_userId: { workId, userId } }
+    })
+
+    if (disagree) {
+      await prisma.ideaDisagree.update({
+        where: { id: disagree.id },
+        data: { reason }
+      })
+    } else {
+      await prisma.ideaDisagree.create({
+        data: { workId, userId, reason }
+      })
+    }
+
+    await logActivity('IDEA_DISAGREE', userId, workId, `Disagreed with proposal. Reason: ${reason}`)
+    revalidatePath('/')
+    revalidatePath('/works')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to disagree:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+export async function replyToDisagree(disagreeId: string, content: string) {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Unauthorized' }
+  const userId = session.user.id
+
+  if (!content || !content.trim()) return { success: false, error: 'Reply cannot be empty' }
+
+  try {
+    const disagree = await prisma.ideaDisagree.findUnique({ where: { id: disagreeId } })
+    if (!disagree) return { success: false, error: 'Disagreement not found' }
+
+    await prisma.ideaDisagreeReply.create({
+      data: {
+        content,
+        disagreeId,
+        userId
+      }
+    })
+
+    await logActivity('DISAGREE_REPLY', userId, disagree.workId, `Replied to a disagreement: "${content}"`)
+    revalidatePath('/')
+    revalidatePath('/works')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to reply to disagree:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+export async function removeDisagree(workId: string) {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Unauthorized' }
+  const userId = session.user.id
+
+  try {
+    await prisma.ideaDisagree.deleteMany({
+      where: { workId, userId }
+    })
+    
+    await logActivity('REMOVE_DISAGREE', userId, workId, `Removed disagreement for this Idea.`)
+    revalidatePath('/')
+    revalidatePath('/works')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to remove disagree:', error)
+    return { success: false, error: error.message }
   }
 }

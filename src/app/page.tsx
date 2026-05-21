@@ -9,6 +9,7 @@ import { Terminal, ArrowRight, Briefcase, Lightbulb, ListOrdered, XCircle, Thumb
 import Link from 'next/link'
 import { Suspense } from 'react'
 import LiveClock from '@/components/LiveClock'
+import AdminHomeClient from '@/components/AdminHomeClient'
 
 export const dynamic = 'force-dynamic'
 
@@ -301,6 +302,12 @@ function WorkspaceGuideCard() {
 // --- MAIN DYNAMIC COMPONENT ---
 export default async function Home() {
   const session = await getSession()
+
+  if (session?.user?.role === 'ADMIN') {
+    const members = await getMembers()
+    const works = await getWorks()
+    return <AdminHomeClient session={session} members={members} works={works} />
+  }
 
   return (
     <div className="space-y-8 pb-20 w-full px-4 sm:px-6 lg:px-12 pt-6">      {/* Header Banner (Instant Render) */}

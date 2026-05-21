@@ -3,9 +3,11 @@
 import { useStore } from '@/store/useStore'
 import { Plus } from 'lucide-react'
 
-export default function CreateWorkTrigger() {
+export default function CreateWorkTrigger({ currentUserRole }: { currentUserRole?: string }) {
   const { setAddWorkModalOpen } = useStore()
   
+  if (currentUserRole === 'ADMIN') return null
+
   return (
     <button
       onClick={() => setAddWorkModalOpen(true)}

@@ -4,10 +4,10 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Lightbulb, Check, Plus, Clock, Calendar, 
-  ThumbsUp, Loader2, Play, ListOrdered, XCircle, Pause, RotateCcw, Trash2,
-  ChevronDown, ChevronUp, History, ArrowRightCircle, AlertTriangle, Archive, Edit2
+  ThumbsUp, ThumbsDown, MessageSquare, CornerDownRight, Loader2, Play, ListOrdered, XCircle, Pause, RotateCcw, Trash2,
+  ChevronDown, ChevronUp, History, ArrowRightCircle, AlertTriangle, Archive, Edit2, Send
 } from 'lucide-react'
-import { createWork, updateWorkStatus, toggleIdeaSupport, queueIdea, declineIdea, shelveIdea, reviveIdea, deleteIdea, editWork, getWorks } from '@/app/actions'
+import { createWork, updateWorkStatus, toggleIdeaSupport, queueIdea, declineIdea, shelveIdea, reviveIdea, deleteIdea, editWork, getWorks, disagreeWithIdea, replyToDisagree, removeDisagree } from '@/app/actions'
 import { getMembers } from '@/app/actions/admin'
 import { useEffect } from 'react'
 import SectionGuide from './SectionGuide'
@@ -56,6 +56,30 @@ interface Idea {
       role: string
     }
   }[]
+  disagrees?: {
+    id: string
+    reason: string
+    userId: string
+    createdAt: string
+    user: {
+      id: string
+      name: string
+      profilePhoto: string | null
+      role: string
+    }
+    replies: {
+      id: string
+      content: string
+      userId: string
+      createdAt: string
+      user: {
+        id: string
+        name: string
+        profilePhoto: string | null
+        role: string
+      }
+    }[]
+  }[]
 }
 
 interface IdeaAgreementHubProps {
@@ -99,6 +123,16 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
   const [declineModalId, setDeclineModalId] = useState<string | null>(null)
   const [declineReason, setDeclineReason] = useState('')
   const [isDeclining, setIsDeclining] = useState(false)
+
+  // Disagree state
+  const [disagreeModalId, setDisagreeModalId] = useState<string | null>(null)
+  const [disagreeReason, setDisagreeReason] = useState('')
+  const [isDisagreeing, setIsDisagreeing] = useState(false)
+
+  // Reply state
+  const [replyModalId, setReplyModalId] = useState<string | null>(null)
+  const [replyContent, setReplyContent] = useState('')
+  const [isReplying, setIsReplying] = useState(false)
 
   // Mentions state
   const [members, setMembers] = useState<any[]>([])
@@ -180,6 +214,34 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     finally { setVotingId(null) }
   }
 
+  async function handleDisagreeSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!disagreeModalId || !disagreeReason.trim()) return
+    setIsDisagreeing(true)
+    try {
+      const res = await disagreeWithIdea(disagreeModalId, disagreeReason)
+      if (res.success) {
+        setDisagreeModalId(null)
+        setDisagreeReason('')
+      } else alert(res.error || 'Failed to submit disagreement')
+    } catch (err) { console.error(err) }
+    finally { setIsDisagreeing(false) }
+  }
+
+  async function handleReplySubmit(e: React.FormEvent, disagreeId: string) {
+    e.preventDefault()
+    if (!replyContent.trim()) return
+    setIsReplying(true)
+    try {
+      const res = await replyToDisagree(disagreeId, replyContent)
+      if (res.success) {
+        setReplyModalId(null)
+        setReplyContent('')
+      } else alert(res.error || 'Failed to submit reply')
+    } catch (err) { console.error(err) }
+    finally { setIsReplying(false) }
+  }
+
   async function handleAction(id: string, action: () => Promise<any>) {
     setActionId(id)
     try {
@@ -234,6 +296,7 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
 
   function renderIdeaCard(idea: Idea) {
     const userVoted = currentUser && idea.supports.some(v => v.userId === currentUser.id)
+    const userDisagreed = currentUser && idea.disagrees?.some(d => d.userId === currentUser.id)
     const approvalRate = membersCount > 0 ? Math.round((idea.supports.length / membersCount) * 100) : 0
     const isExpanded = expandedId === idea.id
     const isQueued = idea.status === 'QUEUED'
@@ -443,8 +506,10 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
             {/* For OPEN/QUEUED proposals */}
             {!isArchived && (
               <>
-                <button
-                  onClick={() => handleVote(idea.id)}
+                {currentUser?.role !== 'ADMIN' && (
+                  <>
+                  <button
+                    onClick={() => handleVote(idea.id)}
                   disabled={votingId === idea.id}
                   className={`text-xs px-3.5 py-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer select-none active:scale-95 ${
                     userVoted 
@@ -455,6 +520,22 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                   {votingId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <ThumbsUp size={12} className={userVoted ? 'fill-[#63BDF2]' : ''} />}
                   <span>{userVoted ? 'Agreed' : 'Agree'}</span>
                 </button>
+
+                <button
+                  onClick={() => userDisagreed ? handleAction(idea.id, () => removeDisagree(idea.id)) : setDisagreeModalId(idea.id)}
+                  disabled={actionId === idea.id}
+                  className={`text-xs px-3.5 py-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer select-none active:scale-95 ${
+                    userDisagreed 
+                      ? 'bg-red-500/15 border border-red-500/35 text-red-400 hover:bg-red-500/25' 
+                      : 'bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10'
+                  }`}
+                  title="Disagree with this proposal"
+                >
+                  {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <ThumbsDown size={12} className={userDisagreed ? 'fill-red-500' : ''} />}
+                  <span>{userDisagreed ? 'Disagreed' : 'Disagree'}</span>
+                </button>
+                  </>
+                )}
 
                 {canManage(idea) && (
                   <>
@@ -633,6 +714,108 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
           </div>
         )}
 
+        {/* Disagreements List */}
+        {!isArchived && idea.disagrees && idea.disagrees.length > 0 && (
+          <div className="pt-3 space-y-3 border-t border-white/5">
+            <span className="text-[9px] uppercase font-bold text-red-500 tracking-wider">Disagreements / Concerns:</span>
+            <div className="space-y-3">
+              {idea.disagrees.map(d => (
+                <div key={d.id} className="bg-red-500/5 border border-red-500/10 rounded-xl p-3 space-y-2 relative">
+                  <div className="flex items-center gap-1.5">
+                    {d.user.profilePhoto ? (
+                      <img src={d.user.profilePhoto} alt={d.user.name} className="w-4 h-4 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center font-bold text-[8px] uppercase">{d.user.name.charAt(0)}</div>
+                    )}
+                    <span className="text-xs font-bold text-red-400">{d.user.name}</span>
+                    <span className="text-[9px] text-zinc-500" suppressHydrationWarning>• {formatRelativeTime(d.createdAt)}</span>
+                  </div>
+                  <p className="text-xs text-zinc-300 pl-5 leading-relaxed">{d.reason}</p>
+                  
+                  {/* Replies */}
+                  {d.replies.length > 0 && (
+                    <div className="pl-5 space-y-2 mt-2 pt-2 border-t border-white/5">
+                      {d.replies.map(r => (
+                        <div key={r.id} className="flex gap-2">
+                          <CornerDownRight size={10} className="text-zinc-600 shrink-0 mt-1" />
+                          <div className="bg-white/5 rounded-lg p-2 flex-1">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <span className="text-[10px] font-bold text-zinc-300">{r.user.name}</span>
+                              <span className="text-[8px] text-zinc-500" suppressHydrationWarning>{formatRelativeTime(r.createdAt)}</span>
+                            </div>
+                            <p className="text-[10px] text-zinc-400">{r.content}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Reply Button */}
+                  <button 
+                    onClick={() => setReplyModalId(d.id)}
+                    className="absolute top-2 right-2 text-[9px] text-zinc-500 hover:text-white flex items-center gap-1 bg-white/5 hover:bg-white/10 px-2 py-1 rounded transition-colors"
+                  >
+                    <MessageSquare size={10} /> Reply
+                  </button>
+
+                  {/* Reply Form */}
+                  <AnimatePresence>
+                    {replyModalId === d.id && (
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden pl-5 mt-2">
+                        <form onSubmit={(e) => handleReplySubmit(e, d.id)} className="flex items-end gap-2">
+                          <div className="flex-1 bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2 flex items-center focus-within:border-white/30 transition-colors">
+                            <input
+                              type="text"
+                              value={replyContent}
+                              onChange={(e) => setReplyContent(e.target.value)}
+                              placeholder="Type a reply (you can use @mentions)..."
+                              className="w-full bg-transparent text-[10px] text-white focus:outline-none"
+                              autoFocus
+                            />
+                          </div>
+                          <button type="submit" disabled={isReplying || !replyContent.trim()} className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl disabled:opacity-50 transition-colors">
+                            {isReplying ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                          </button>
+                          <button type="button" onClick={() => { setReplyModalId(null); setReplyContent(''); }} className="p-2 text-zinc-500 hover:text-white transition-colors">
+                            <XCircle size={12} />
+                          </button>
+                        </form>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Disagree Modal Form */}
+        <AnimatePresence>
+          {disagreeModalId === idea.id && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+              <form onSubmit={handleDisagreeSubmit} className="mt-4 bg-red-500/5 border border-red-500/20 p-4 rounded-xl space-y-3">
+                <h4 className="text-[10px] uppercase font-bold text-red-400 flex items-center gap-1.5">
+                  <AlertTriangle size={12} /> Why do you disagree?
+                </h4>
+                <textarea 
+                  value={disagreeReason}
+                  onChange={e => setDisagreeReason(e.target.value)}
+                  placeholder="Explain your concerns so the team can discuss and resolve them..."
+                  rows={2}
+                  className="w-full bg-[#0c0d12]/60 border border-red-500/20 rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-red-500/50 resize-none"
+                  autoFocus
+                />
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={() => { setDisagreeModalId(null); setDisagreeReason(''); }} className="text-[10px] bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg text-zinc-400 hover:text-white transition-colors">Cancel</button>
+                  <button type="submit" disabled={isDisagreeing || !disagreeReason.trim()} className="text-[10px] bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg font-bold disabled:opacity-50 transition-colors flex items-center gap-1">
+                    {isDisagreeing ? <Loader2 size={10} className="animate-spin" /> : 'Submit'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Activity Log Audit Timeline */}
         {idea.activityLogs && idea.activityLogs.length > 0 && (
           <div className="border-t border-white/5 pt-3">
@@ -716,12 +899,14 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
             content="IDEA → Team votes Agree → QUEUED (ready for work) → ACTIVE (started). If team doesn't agree, ideas can be DECLINED (with reason) or SHELVED (maybe later). Declined/Shelved ideas can be REVIVED or permanently DELETED. Every action is timestamped with full audit trail."
           />
         </div>
-        <button 
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="text-xs bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-500 hover:to-amber-600 text-black px-4 py-2.5 rounded-xl font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer select-none shrink-0 w-full sm:w-auto shadow-md shadow-yellow-500/10 active:scale-95 border-0"
-        >
-          <Plus size={14} className="stroke-[3]" /> New Proposal
-        </button>
+        {!isAdmin && (
+          <button 
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="text-xs bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-500 hover:to-amber-600 text-black px-4 py-2.5 rounded-xl font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer select-none shrink-0 w-full sm:w-auto shadow-md shadow-yellow-500/10 active:scale-95 border-0"
+          >
+            <Plus size={14} className="stroke-[3]" /> New Proposal
+          </button>
+        )}
       </div>
 
       {/* Add Idea Form */}
@@ -757,7 +942,7 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-yellow-500 uppercase tracking-wider">Idea Creators (10 pts)</label>
                   <div className="flex flex-wrap gap-1.5 p-2 bg-[#0c0d12]/60 border border-white/10 rounded-xl min-h-[38px]">
-                     {members.map(m => (
+                     {members.filter(m => m.role !== 'ADMIN').map(m => (
                        <button
                          type="button"
                          key={m.id}

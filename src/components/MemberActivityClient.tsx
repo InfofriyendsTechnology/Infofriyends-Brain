@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Users, Calendar, Briefcase, CheckCircle2, Lightbulb, Clock, 
-  Star, MessageSquare, Award, Shield, Search, LayoutGrid, Table, 
-  MessageSquareQuote, TrendingUp, Sparkles
+import { Users, Calendar, Briefcase, CheckCircle2, Lightbulb, Clock, 
+  MessageSquareQuote, TrendingUp, Sparkles, Plus, X, ShieldAlert,
+  UserPlus, Loader2, Shield, Search, LayoutGrid, Table
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import ImpersonateButton from './ImpersonateButton'
 
 interface Work {
   id: string
@@ -31,19 +32,24 @@ interface Member {
   averageRating?: number
 }
 
+import { impersonateMemberAction } from '@/app/actions/admin'
+
 interface MemberActivityClientProps {
   members: Member[]
   works: Work[]
   currentUserId?: string
+  currentUserRole?: string
 }
 
-export default function MemberActivityClient({ members, works, currentUserId }: MemberActivityClientProps) {
+export default function MemberActivityClient({ members, works, currentUserId, currentUserRole }: MemberActivityClientProps) {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
 
   const filteredMembers = members.filter(member => 
-    member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    member.username.toLowerCase().includes(searchQuery.toLowerCase())
+    member.role !== 'ADMIN' &&
+    (member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    member.username.toLowerCase().includes(searchQuery.toLowerCase()))
   )
 
   // Sort members by contribution score (descending)
@@ -64,7 +70,8 @@ export default function MemberActivityClient({ members, works, currentUserId }: 
           />
         </div>
 
-        <div className="flex bg-zinc-950/80 p-1 border border-white/5 rounded-2xl shrink-0 self-stretch sm:self-auto justify-center">
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="flex bg-zinc-950/80 p-1 border border-white/5 rounded-2xl">
           <button
             onClick={() => setViewMode('grid')}
             className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold tracking-wider uppercase transition-all duration-300 ${
@@ -85,6 +92,7 @@ export default function MemberActivityClient({ members, works, currentUserId }: 
           >
             <Table size={14} /> Table
           </button>
+          </div>
         </div>
       </div>
 
@@ -111,7 +119,12 @@ export default function MemberActivityClient({ members, works, currentUserId }: 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: Math.min(index * 0.05, 0.4) }}
-                  className="group relative bg-zinc-900/10 backdrop-blur-xl border border-white/5 hover:border-amber-500/20 rounded-3xl p-6 transition-all duration-300 flex flex-col justify-between hover:shadow-[0_0_30px_-10px_rgba(245,158,11,0.06)]"
+                  onClick={() => router.push(`/members/${member.id}`)}
+                  className={`group relative backdrop-blur-xl border rounded-3xl p-6 transition-all duration-300 flex flex-col justify-between cursor-pointer ${
+                    member.role === 'ADMIN'
+                      ? 'bg-gradient-to-b from-[#3188DA]/10 to-[#09090b]/40 border-[#63BDF2]/30 hover:border-[#63BDF2]/60 hover:shadow-[0_0_30px_-10px_rgba(99,189,242,0.2)]'
+                      : 'bg-zinc-900/10 border-white/5 hover:border-amber-500/20 hover:shadow-[0_0_30px_-10px_rgba(245,158,11,0.06)]'
+                  }`}
                 >
                   <div className="space-y-5">
                     {/* Header */}
@@ -122,34 +135,37 @@ export default function MemberActivityClient({ members, works, currentUserId }: 
                             <img 
                               src={member.profilePhoto} 
                               alt={member.name} 
-                              className="w-14 h-14 rounded-2xl object-cover border border-white/10 group-hover:border-amber-500/30 transition-colors" 
+                              className={`w-14 h-14 rounded-2xl object-cover border transition-colors ${
+                                member.role === 'ADMIN' ? 'border-[#63BDF2]/40 group-hover:border-[#63BDF2]' : 'border-white/10 group-hover:border-amber-500/30'
+                              }`} 
                             />
                           ) : (
-                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-white/5 text-amber-400 flex items-center justify-center font-black text-xl uppercase group-hover:border-amber-500/30 transition-colors">
+                            <div className={`w-14 h-14 rounded-2xl border flex items-center justify-center font-black text-xl uppercase transition-colors ${
+                              member.role === 'ADMIN' ? 'bg-gradient-to-br from-[#63BDF2]/10 to-[#3188DA]/10 border-[#63BDF2]/30 text-[#63BDF2] group-hover:border-[#63BDF2]' : 'bg-gradient-to-br from-amber-500/10 to-orange-500/10 border-white/5 text-amber-400 group-hover:border-amber-500/30'
+                            }`}>
                               {member.name.charAt(0)}
                             </div>
                           )}
                           {member.role === 'ADMIN' && (
-                            <span className="absolute -bottom-1 -right-1 text-[8px] bg-gradient-to-r from-amber-500 to-orange-600 text-black px-1.5 py-0.5 rounded font-black tracking-wide uppercase shadow-sm">
+                            <span className="absolute -bottom-2 -right-2 text-[8px] bg-gradient-to-r from-[#63BDF2] to-[#3188DA] text-black px-1.5 py-0.5 rounded font-black tracking-wide uppercase shadow-sm border border-[#09090b]">
                               ADM
                             </span>
                           )}
                         </div>
                         <div className="min-w-0">
-                          <h3 className="text-base font-bold text-white group-hover:text-amber-400 transition-colors capitalize truncate">{member.name}</h3>
+                          <h3 className={`text-base font-bold transition-colors capitalize truncate ${member.role === 'ADMIN' ? 'text-white group-hover:text-[#63BDF2]' : 'text-white group-hover:text-amber-400'}`}>{member.name}</h3>
                           <span className="text-xs text-zinc-500 font-mono">@{member.username}</span>
                         </div>
                       </div>
 
-                      {/* Professional Rating Badge */}
+                      {/* Contribution Score Badge */}
                       <div className="bg-zinc-950/80 border border-white/5 rounded-2xl px-3 py-2 flex flex-col items-center justify-center min-w-[70px] shadow-inner shrink-0">
                         <div className="flex items-center gap-1">
-                          <span className="text-lg font-black text-amber-400 leading-none">
-                            {Number(member.averageRating || 0).toFixed(1)}
+                          <span className="text-lg font-black text-emerald-400 leading-none">
+                            {member.contributionScore || 0}
                           </span>
-                          <Star className="text-amber-400 fill-amber-400 shrink-0" size={14} />
                         </div>
-                        <span className="text-[8px] uppercase tracking-wider text-zinc-500 font-extrabold mt-1">Rating</span>
+                        <span className="text-[8px] uppercase tracking-wider text-zinc-500 font-extrabold mt-1">Points</span>
                       </div>
                     </div>
 
@@ -190,75 +206,35 @@ export default function MemberActivityClient({ members, works, currentUserId }: 
                     {/* Recent Works Badges */}
                     {createdWorks.length > 0 && (
                       <div className="space-y-2">
-                        <div className="flex items-center gap-1.5">
-                          <TrendingUp size={11} className="text-zinc-500" />
-                          <span className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider">Recent Shipped</span>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <TrendingUp size={11} className="text-zinc-500" />
+                            <span className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider">Recent Shipped</span>
+                          </div>
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                           {createdWorks.slice(0, 3).map(w => {
                             const statusColor = 
-                              w.status === 'ACTIVE' ? 'bg-[#63BDF2]/10 text-[#63BDF2] border-[#63BDF2]/10' :
-                              w.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/10' :
-                              w.status === 'BLOCKED' ? 'bg-red-500/10 text-red-400 border-red-500/10' :
-                              w.status === 'IDEA' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/10' :
-                              'bg-white/5 text-zinc-400 border-white/10'
+                              w.status === 'COMPLETED' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' :
+                              w.status === 'ACTIVE' ? 'text-[#63BDF2] bg-[#63BDF2]/10 border-[#63BDF2]/20' :
+                              w.status === 'IDEA' ? 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20' :
+                              'text-zinc-400 bg-zinc-400/10 border-zinc-400/20'
+                              
                             return (
-                              <span key={w.id} className={`text-[9px] px-2.5 py-1 rounded-lg border font-bold truncate max-w-[130px] ${statusColor}`}>
+                              <span key={w.id} className={`text-[9px] px-2 py-0.5 rounded border font-bold truncate max-w-[120px] ${statusColor}`}>
                                 {w.name}
                               </span>
                             )
                           })}
-                          {createdWorks.length > 3 && (
-                            <span className="text-[9px] px-2 py-1 rounded-lg bg-zinc-950/50 border border-white/5 text-zinc-500 font-semibold">
-                              +{createdWorks.length - 3} more
-                            </span>
-                          )}
                         </div>
                       </div>
                     )}
                   </div>
-
-                  {/* Peer Reviews / Testimony Block */}
-                  {completedWorks.some(w => w.reviews?.length > 0) && (
-                    <div className="mt-5 pt-4 border-t border-white/5 space-y-3">
-                      <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-extrabold text-amber-500/80">
-                        <MessageSquareQuote size={12} />
-                        <span>Peer Feedback Proof</span>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        {completedWorks.flatMap(w => w.reviews || []).slice(0, 2).map((r: any, idx: number) => (
-                          <div key={idx} className="bg-zinc-950/50 border border-white/5 rounded-2xl p-3 space-y-1.5 hover:border-white/10 transition-colors">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[9px] text-zinc-500 font-bold capitalize">
-                                {r.reviewer?.name || 'Anonymous Reviewer'}
-                              </span>
-                              <div className="flex gap-0.5">
-                                {Array.from({ length: 5 }).map((_, i) => (
-                                  <Star 
-                                    key={i} 
-                                    size={9} 
-                                    className={i < r.rating 
-                                      ? "text-amber-400 fill-amber-400" 
-                                      : "text-zinc-700 fill-zinc-800"
-                                    } 
-                                  />
-                                ))}
-                              </div>
-                            </div>
-                            {r.feedback && (
-                              <p className="text-[11px] text-zinc-300 leading-relaxed italic pr-2 font-medium">
-                                "{r.feedback}"
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                        {completedWorks.flatMap(w => w.reviews || []).length > 2 && (
-                          <div className="text-[9px] text-zinc-500 font-semibold text-right pr-1">
-                            +{completedWorks.flatMap(w => w.reviews || []).length - 2} more testimonies
-                          </div>
-                        )}
-                      </div>
+                  
+                  {/* Subtle Login As Member Action */}
+                  {currentUserRole === 'ADMIN' && member.id !== currentUserId && member.role !== 'ADMIN' && (
+                    <div className="pt-4 mt-4 border-t border-white/5" onClick={(e) => e.stopPropagation()}>
+                      <ImpersonateButton memberId={member.id} memberName={member.name} />
                     </div>
                   )}
                 </motion.div>
@@ -277,7 +253,7 @@ export default function MemberActivityClient({ members, works, currentUserId }: 
               <thead>
                 <tr className="border-b border-white/5 bg-zinc-950 text-[10px] uppercase font-bold tracking-wider text-zinc-400">
                   <th className="px-6 py-4">Member</th>
-                  <th className="px-6 py-4 text-center">Avg Rating</th>
+                  <th className="px-6 py-4 text-center">Points</th>
                   <th className="px-6 py-4 text-center">Active</th>
                   <th className="px-6 py-4 text-center">Completed</th>
                   <th className="px-6 py-4 text-center">Ideas</th>
@@ -294,27 +270,38 @@ export default function MemberActivityClient({ members, works, currentUserId }: 
                   const latestWork = createdWorks[0]
 
                   return (
-                    <tr key={member.id} className="hover:bg-white/[0.01] transition-colors">
+                      <tr 
+                      key={member.id} 
+                      onClick={() => router.push(`/members/${member.id}`)}
+                      className={`transition-colors cursor-pointer ${member.role === 'ADMIN' ? 'bg-[#63BDF2]/5 hover:bg-[#63BDF2]/10 border-b border-[#63BDF2]/20' : 'hover:bg-white/[0.01] border-b border-white/5'}`}
+                    >
                       {/* Member Info */}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          {member.profilePhoto ? (
-                            <img src={member.profilePhoto} alt={member.name} className="w-9 h-9 rounded-xl object-cover border border-white/10" />
-                          ) : (
-                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-white/5 text-amber-400 flex items-center justify-center font-bold text-xs uppercase">
-                              {member.name.charAt(0)}
-                            </div>
-                          )}
+                          <div className="relative shrink-0">
+                            {member.profilePhoto ? (
+                              <img src={member.profilePhoto} alt={member.name} className={`w-9 h-9 rounded-xl object-cover border ${member.role === 'ADMIN' ? 'border-[#63BDF2]/40' : 'border-white/10'}`} />
+                            ) : (
+                              <div className={`w-9 h-9 rounded-xl border flex items-center justify-center font-bold text-xs uppercase ${member.role === 'ADMIN' ? 'bg-gradient-to-br from-[#63BDF2]/10 to-[#3188DA]/10 border-[#63BDF2]/30 text-[#63BDF2]' : 'bg-gradient-to-br from-amber-500/10 to-orange-500/10 border-white/5 text-amber-400'}`}>
+                                {member.name.charAt(0)}
+                              </div>
+                            )}
+                            {member.role === 'ADMIN' && (
+                              <span className="absolute -bottom-1 -right-1 text-[6px] bg-gradient-to-r from-[#63BDF2] to-[#3188DA] text-black px-1 py-0.5 rounded font-black tracking-wide uppercase shadow-sm">
+                                ADM
+                              </span>
+                            )}
+                          </div>
                           <div>
                             <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-white capitalize leading-tight">{member.name}</span>
-                              {member.role === 'ADMIN' && (
-                                <span className="text-[7px] bg-amber-500/20 text-amber-400 border border-amber-500/20 px-1 rounded font-black tracking-wide uppercase">
-                                  ADM
-                                </span>
-                              )}
+                              <span className={`font-bold capitalize leading-tight ${member.role === 'ADMIN' ? 'text-white' : 'text-white'}`}>{member.name}</span>
                             </div>
                             <span className="text-[10px] text-zinc-500 font-mono block">@{member.username}</span>
+                            {currentUserRole === 'ADMIN' && member.id !== currentUserId && member.role !== 'ADMIN' && (
+                              <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                                <ImpersonateButton memberId={member.id} memberName={member.name} />
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -322,8 +309,7 @@ export default function MemberActivityClient({ members, works, currentUserId }: 
                       {/* Rating column */}
                       <td className="px-6 py-4 text-center">
                         <div className="inline-flex items-center justify-center gap-1.5 bg-zinc-900 border border-white/5 px-2.5 py-1 rounded-xl shadow-inner">
-                          <span className="font-black text-amber-400">{Number(member.averageRating || 0).toFixed(1)}</span>
-                          <Star className="text-amber-400 fill-amber-400" size={12} />
+                          <span className="font-black text-emerald-400">{member.contributionScore || 0}</span>
                         </div>
                       </td>
 
@@ -354,6 +340,8 @@ export default function MemberActivityClient({ members, works, currentUserId }: 
           </motion.div>
         )}
       </AnimatePresence>
+
+
 
       {sortedMembers.length === 0 && (
         <div className="text-center py-16 text-zinc-500 text-sm">

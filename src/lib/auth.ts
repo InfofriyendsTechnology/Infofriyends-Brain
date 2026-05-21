@@ -27,6 +27,22 @@ export async function login(user: { id: string; role: string; name: string; user
   cookieStore.set('session', session, { expires, httpOnly: true, path: '/' })
 }
 
+export async function impersonate(targetUser: any, impersonatorUser: any) {
+  const expires = new Date(Date.now() + 1 * 24 * 60 * 60 * 1000) // 1 day impersonation
+  const session = await encrypt({ user: targetUser, impersonator: impersonatorUser, expires })
+  
+  const cookieStore = await cookies()
+  cookieStore.set('session', session, { expires, httpOnly: true, path: '/' })
+}
+
+export async function revertImpersonation() {
+  const currentSession = await getSession()
+  if (!currentSession || !currentSession.impersonator) return false
+  
+  await login(currentSession.impersonator)
+  return true
+}
+
 export async function logout() {
   const cookieStore = await cookies()
   cookieStore.set('session', '', { expires: new Date(0), path: '/' })

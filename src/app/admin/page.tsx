@@ -1,81 +1,39 @@
-import { getMembers } from '@/app/actions/admin'
-import AdminDashboardClient from '@/components/AdminDashboardClient'
-import { Suspense } from 'react'
-import { UserPlus } from 'lucide-react'
+import { getSession } from '@/lib/auth'
+import { redirect } from 'next/navigation'
+import AdminDashboardClient from './AdminDashboardClient'
+import { Shield } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
-// --- ADMIN MEMBERS STREAMING SECTION ---
-async function AdminSection() {
-  let members: any[] = []
-  try {
-    members = await getMembers()
-  } catch (e) {}
-
-  return <AdminDashboardClient initialMembers={members} />
-}
-
-function AdminSkeleton() {
-  return (
-    <div className="space-y-8 select-none animate-pulse">
-      {/* Top HUD Row Skeleton */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="space-y-2">
-          <div className="h-9 w-64 bg-white/5 rounded-xl border border-white/5" />
-          <div className="h-4 w-96 bg-white/5 rounded-lg border border-white/5" />
-        </div>
-        <button className="flex items-center gap-2 bg-white/5 text-transparent px-5 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all border border-white/5 cursor-pointer shrink-0">
-          <UserPlus size={16} /> Add New Member
-        </button>
-      </div>
-
-      {/* Main Table Container Skeleton */}
-      <div className="bg-secondary/10 border border-border/30 rounded-3xl p-6 backdrop-blur-xl space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-border/30">
-          <div className="h-6 w-48 bg-white/5 rounded-lg" />
-          <div className="h-10 w-80 bg-white/5 rounded-xl border border-white/5" />
-        </div>
-
-        {/* Table Body Skeleton */}
-        <div className="border border-border/50 rounded-2xl overflow-hidden bg-background/30">
-          <div className="overflow-x-auto">
-            <div className="divide-y divide-border/50">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="px-6 py-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-white/5" />
-                    <div className="space-y-1">
-                      <div className="h-3 w-32 bg-white/5 rounded" />
-                      <div className="h-2.5 w-24 bg-white/5 rounded" />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="h-3 w-28 bg-white/5 rounded" />
-                    <div className="h-2.5 w-36 bg-white/5 rounded" />
-                  </div>
-                  <div className="h-6 w-20 bg-white/5 rounded-full" />
-                  <div className="h-6 w-16 bg-white/5 rounded-lg" />
-                  <div className="flex gap-2">
-                    <div className="w-8 h-8 bg-white/5 rounded-lg" />
-                    <div className="w-8 h-8 bg-white/5 rounded-lg" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// --- MAIN DYNAMIC PAGE ---
 export default async function AdminPage() {
+  const session = await getSession()
+  
+  if (!session || session.user.role !== 'ADMIN') {
+    redirect('/')
+  }
+
   return (
-    <div className="w-full px-4 sm:px-6 lg:px-12 pt-6 pb-24">
-      <Suspense fallback={<AdminSkeleton />}>
-        <AdminSection />
-      </Suspense>
+    <div className="space-y-8 pb-20 w-full px-4 sm:px-6 lg:px-12 pt-6">
+      {/* Header Banner */}
+      <div className="relative overflow-hidden rounded-3xl border border-border/40 bg-gradient-to-br from-[#63BDF2]/10 via-background to-[#3188DA]/5 p-6 md:p-8 backdrop-blur-xl">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-[#63BDF2]/10 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-60 h-60 bg-[#3188DA]/5 rounded-full blur-[80px] pointer-events-none" />
+
+        <div className="relative z-10 space-y-3">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#63BDF2]/10 border border-[#63BDF2]/20 text-xs font-semibold text-[#63BDF2] uppercase tracking-wider">
+            <Shield size={12} /> Admin Workspace
+          </div>
+          <h1 className="text-2xl sm:text-3xl md:text-5xl font-black tracking-tight text-white leading-tight">
+            Super <span className="bg-gradient-to-r from-[#63BDF2] to-[#3188DA] bg-clip-text text-transparent">Admin Hub</span>
+          </h1>
+          <p className="text-muted-foreground text-sm md:text-base max-w-xl leading-relaxed">
+            Manage your organization professionally. Add new members and manage team access securely.
+          </p>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <AdminDashboardClient />
     </div>
   )
 }

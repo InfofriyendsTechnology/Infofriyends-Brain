@@ -4,11 +4,12 @@ import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
 import { useStore } from '@/store/useStore'
-import { Plus, HelpCircle, Notebook } from 'lucide-react'
+import { Plus, HelpCircle, Notebook, LogOut } from 'lucide-react'
 import { AnimatePresence } from 'framer-motion'
 import HelpGuideModal from './HelpGuideModal'
 import NotificationsDropdown from './NotificationsDropdown'
 import NotesDrawer from './NotesDrawer'
+import { revertImpersonationAction } from '@/app/actions/admin'
 
 export default function AppLayout({ children, session }: { children: React.ReactNode, session: any }) {
   const pathname = usePathname()
@@ -39,10 +40,29 @@ export default function AppLayout({ children, session }: { children: React.React
   return (
     <div className="min-h-screen bg-background text-foreground h-[100dvh] overflow-hidden flex flex-col lg:flex-row">
       <Sidebar session={session} />
-      <main className="flex-1 h-full lg:pl-72 overflow-hidden flex flex-col">
+      <main className="flex-1 h-full lg:pl-72 overflow-hidden flex flex-col relative">
         <div className={`flex-1 w-full h-full min-h-0 flex flex-col ${isChatPage ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar'} ${mainPaddingClass} transition-all duration-300`}>
           {children}
         </div>
+
+        {/* Impersonation Banner */}
+        {session?.impersonator && (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-red-500/20 border border-red-500/50 backdrop-blur-md px-4 py-2.5 rounded-full shadow-2xl">
+            <span className="text-xs font-bold text-red-200">
+              Impersonating: <span className="text-white">{session.user.name}</span>
+            </span>
+            <button
+              onClick={async () => {
+                await revertImpersonationAction()
+                window.location.href = '/' // Force full reload to reset state
+              }}
+              className="text-xs bg-red-500 text-white px-3 py-1.5 rounded-full font-bold hover:bg-red-600 transition-colors flex items-center gap-1.5"
+            >
+              <LogOut size={12} />
+              Back to Admin
+            </button>
+          </div>
+        )}
       </main>
 
       {/* Global Utilities Toolbar (floating on all pages) */}
@@ -86,7 +106,7 @@ export default function AppLayout({ children, session }: { children: React.React
       <NotesDrawer isOpen={isNotesOpen} onClose={() => setIsNotesOpen(false)} />
 
       {/* Mobile Floating Action Button (FAB) to start new work */}
-      {session && !isLoginPage && pathname === '/works' && (
+      {session && session.user?.role !== 'ADMIN' && !isLoginPage && pathname === '/works' && (
         <button
           onClick={() => setAddWorkModalOpen(true)}
           className={`lg:hidden fixed ${isNavbarHidden ? 'bottom-6' : 'bottom-24'} right-6 z-40 bg-[#63BDF2] text-black w-12 h-12 rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(99,189,242,0.45)] hover:scale-105 active:scale-95 transition-all cursor-pointer`}
