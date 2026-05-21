@@ -29,7 +29,6 @@ interface Member {
   createdAt: string
   lastActive: string | null
   contributionScore: number
-  contributionScore: number
   averageRating?: number
 }
 
