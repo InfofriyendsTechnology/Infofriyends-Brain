@@ -38,7 +38,9 @@ async function MetricsSection() {
         name: m.name,
         lastActive: m.lastActive,
         role: m.role,
-        profilePhoto: m.profilePhoto
+        profilePhoto: m.profilePhoto,
+        contributionScore: m.contributionScore || m.totalPoints || 0,
+        completedWorksCount: m.completedWorksCount || 0
       }))}
     />
   )

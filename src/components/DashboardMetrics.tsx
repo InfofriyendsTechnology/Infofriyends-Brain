@@ -9,6 +9,18 @@ interface MemberInfo {
   lastActive: string | null
   role: string
   profilePhoto?: string | null
+  contributionScore?: number
+  completedWorksCount?: number
+}
+
+function getRelativeTime(dateStr: string) {
+  const diff = new Date().getTime() - new Date(dateStr).getTime()
+  const mins = Math.round(diff / (1000 * 60))
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.round(hours / 24)}d ago`
 }
 
 function getActiveMembers(members: MemberInfo[]) {
@@ -53,6 +65,16 @@ export default function DashboardMetrics({
   const activeMembers = getActiveMembers(members)
   const totalNonAdmin = members.filter(m => m.role !== 'ADMIN').length
   const avgHours = getAvgActiveHours(members)
+
+  const sortedNonAdmins = [...members]
+    .filter(m => m.role !== 'ADMIN')
+    .sort((a, b) => (b.contributionScore || 0) - (a.contributionScore || 0))
+
+  const activeMembersSorted = [...activeMembers].sort((a, b) => {
+    const rankA = sortedNonAdmins.findIndex(x => x.id === a.id)
+    const rankB = sortedNonAdmins.findIndex(x => x.id === b.id)
+    return rankA - rankB
+  })
 
   const metrics = [
     {
@@ -111,38 +133,41 @@ export default function DashboardMetrics({
             <p className="text-[10px] md:text-xs text-muted-foreground">{metric.description}</p>
           </div>
 
-          {/* Active members activity trend - only for the Active Members card */}
-          {metric.title === 'Active Members' && (
-            <div className="flex flex-col gap-1.5 mt-4 pt-3 border-t border-white/5">
-              <span className="text-[8px] font-black uppercase text-zinc-500 tracking-wider">Activity Trend</span>
-              <div className="flex items-end justify-between gap-2.5 h-10 px-1 pt-1">
-                {[
-                  { label: '2d ago', count: Math.max(1, Math.round(activeMembers.length * 0.7)), current: false },
-                  { label: '1d ago', count: Math.max(1, Math.round(activeMembers.length * 0.85)), current: false },
-                  { label: 'Today', count: activeMembers.length, current: true },
-                  { label: 'Tomorrow', count: Math.max(1, Math.round(activeMembers.length * 0.9)), current: false },
-                  { label: '2d later', count: Math.max(1, Math.round(activeMembers.length * 0.6)), current: false },
-                ].map((item, index) => {
-                  const maxPossible = Math.max(totalNonAdmin, 1)
-                  const pct = (item.count / maxPossible) * 100
+          {/* Active members list - only for the Active Members card */}
+          {metric.title === 'Active Members' && activeMembersSorted.length > 0 && (
+            <div className="flex flex-col gap-1.5 mt-4 pt-3 border-t border-white/5 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
+              <span className="text-[8px] font-black uppercase text-zinc-500 tracking-wider mb-1 block">Active Today</span>
+              <div className="space-y-1.5">
+                {activeMembersSorted.map((m) => {
+                  const rank = sortedNonAdmins.findIndex(x => x.id === m.id) + 1
+                  const relativeTime = m.lastActive ? getRelativeTime(m.lastActive) : 'Offline'
+                  
+                  // Rank badge style
+                  let rankBadge = ""
+                  let rankColor = "text-zinc-400 bg-zinc-500/10 border border-zinc-500/15"
+                  if (rank === 1) {
+                    rankBadge = "🥇 "
+                    rankColor = "text-yellow-400 bg-yellow-500/10 border border-yellow-500/20"
+                  } else if (rank === 2) {
+                    rankBadge = "🥈 "
+                    rankColor = "text-zinc-300 bg-zinc-300/10 border border-zinc-300/20"
+                  } else if (rank === 3) {
+                    rankBadge = "🥉 "
+                    rankColor = "text-amber-600 bg-amber-600/10 border border-amber-600/20"
+                  }
+
                   return (
-                    <div key={index} className="flex-1 flex flex-col items-center gap-1 group/bar relative">
-                      <div className="w-full bg-white/5 hover:bg-white/10 rounded-md h-7 flex items-end overflow-hidden cursor-help">
-                        <div 
-                          className={`w-full rounded-b-sm transition-all duration-500 ${
-                            item.current 
-                              ? 'bg-gradient-to-t from-amber-600 to-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.3)]' 
-                              : 'bg-zinc-600/50'
-                          }`}
-                          style={{ height: `${Math.max(15, pct)}%` }}
-                        />
+                    <div 
+                      key={m.id} 
+                      className="flex items-center justify-between text-[10px] bg-white/[0.02] hover:bg-white/[0.04] border border-white/5 hover:border-white/10 rounded-lg px-2.5 py-1.5 transition-all"
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className={`text-[8px] px-1.5 py-0.5 rounded font-black tracking-tighter ${rankColor}`}>
+                          {rankBadge}#{rank}
+                        </span>
+                        <span className="font-semibold text-white truncate max-w-[80px] sm:max-w-[100px]">{m.name}</span>
                       </div>
-                      <span className="text-[7px] font-bold text-zinc-500 uppercase tracking-tight">{item.label}</span>
-                      
-                      {/* Tooltip */}
-                      <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-zinc-950 border border-white/10 text-white text-[8px] font-bold py-1 px-1.5 rounded opacity-0 pointer-events-none group-hover/bar:opacity-100 transition-opacity duration-200 whitespace-nowrap z-25 shadow-xl">
-                        {item.count} active
-                      </div>
+                      <span className="text-[8px] font-mono text-emerald-400 font-bold shrink-0">{relativeTime}</span>
                     </div>
                   )
                 })}
