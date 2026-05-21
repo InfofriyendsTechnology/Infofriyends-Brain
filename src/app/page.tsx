@@ -36,6 +36,7 @@ async function MetricsSection() {
       members={members.map((m: any) => ({
         id: m.id,
         name: m.name,
+        username: m.username,
         lastActive: m.lastActive,
         role: m.role,
         profilePhoto: m.profilePhoto,

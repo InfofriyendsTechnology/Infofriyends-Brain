@@ -6,6 +6,7 @@ import { Activity, CheckCircle2, MessageSquare, Users, Clock } from 'lucide-reac
 interface MemberInfo {
   id: string
   name: string
+  username: string
   lastActive: string | null
   role: string
   profilePhoto?: string | null
@@ -142,32 +143,42 @@ export default function DashboardMetrics({
                   const rank = sortedNonAdmins.findIndex(x => x.id === m.id) + 1
                   const relativeTime = m.lastActive ? getRelativeTime(m.lastActive) : 'Offline'
                   
-                  // Rank badge style
-                  let rankBadge = ""
-                  let rankColor = "text-zinc-400 bg-zinc-500/10 border border-zinc-500/15"
-                  if (rank === 1) {
-                    rankBadge = "🥇 "
-                    rankColor = "text-yellow-400 bg-yellow-500/10 border border-yellow-500/20"
-                  } else if (rank === 2) {
-                    rankBadge = "🥈 "
-                    rankColor = "text-zinc-300 bg-zinc-300/10 border border-zinc-300/20"
-                  } else if (rank === 3) {
-                    rankBadge = "🥉 "
-                    rankColor = "text-amber-600 bg-amber-600/10 border border-amber-600/20"
-                  }
-
                   return (
                     <div 
                       key={m.id} 
-                      className="flex items-center justify-between text-[10px] bg-white/[0.02] hover:bg-white/[0.04] border border-white/5 hover:border-white/10 rounded-lg px-2.5 py-1.5 transition-all"
+                      className={`flex items-center justify-between gap-2 p-1.5 rounded-xl border transition-all duration-300 ${
+                        rank === 1 ? 'bg-amber-500/5 border-amber-500/20 hover:border-amber-500/40' : 
+                        rank === 2 ? 'bg-zinc-300/5 border-zinc-500/20 hover:border-zinc-500/40' : 
+                        rank === 3 ? 'bg-amber-700/5 border-amber-700/20 hover:border-amber-700/40' : 
+                        'bg-white/[0.02] border-white/5 hover:border-white/10'
+                      }`}
                     >
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className={`text-[8px] px-1.5 py-0.5 rounded font-black tracking-tighter ${rankColor}`}>
-                          {rankBadge}#{rank}
-                        </span>
-                        <span className="font-semibold text-white truncate max-w-[80px] sm:max-w-[100px]">{m.name}</span>
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center font-black text-[10px] uppercase shrink-0 ${
+                          rank === 1 ? 'bg-amber-500/20 text-amber-400' : 
+                          rank === 2 ? 'bg-zinc-300/20 text-zinc-300' :
+                          rank === 3 ? 'bg-amber-700/20 text-amber-600' :
+                          'bg-primary/20 text-primary'
+                        }`}>
+                          {m.name.charAt(0)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-[10px] font-semibold text-white truncate leading-none mb-0.5">{m.name}</h4>
+                          <span className="text-[8px] text-muted-foreground font-mono block truncate">@{m.username}</span>
+                        </div>
                       </div>
-                      <span className="text-[8px] font-mono text-emerald-400 font-bold shrink-0">{relativeTime}</span>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[8px] font-mono text-emerald-400 font-bold text-right">{relativeTime}</span>
+                        <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 ${
+                          rank === 1 ? 'bg-amber-500 text-black' : 
+                          rank === 2 ? 'bg-zinc-300 text-black' : 
+                          rank === 3 ? 'bg-amber-700 text-white' : 
+                          'bg-secondary text-muted-foreground'
+                        }`}>
+                          {rank}
+                        </span>
+                      </div>
                     </div>
                   )
                 })}
