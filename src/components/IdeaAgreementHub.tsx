@@ -80,6 +80,14 @@ interface Idea {
       }
     }[]
   }[]
+  personMentions?: {
+    id: string
+    userId: string
+    user: {
+      id: string
+      name: string
+    }
+  }[]
 }
 
 interface IdeaAgreementHubProps {
