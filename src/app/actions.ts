@@ -552,6 +552,65 @@ export async function toggleIdeaSupport(workId: string) {
   }
 }
 
+export async function adminAllAgree(workId: string) {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Unauthorized' }
+  const user = session.user
+  if (user.role !== 'ADMIN') return { success: false, error: 'Only Super Admin can use All Agree' }
+
+  try {
+    const work = await prisma.work.findUnique({ where: { id: workId } })
+    if (!work) return { success: false, error: 'Work not found' }
+    if (work.status !== 'IDEA' && work.status !== 'QUEUED') {
+      return { success: false, error: 'Can only use All Agree on open/queued proposals' }
+    }
+
+    // Get all non-ADMIN members
+    const allMembers = await prisma.user.findMany({
+      where: { role: { not: 'ADMIN' } },
+      select: { id: true, name: true }
+    })
+
+    // Get existing supports so we don't duplicate
+    const existingSupports = await prisma.ideaSupport.findMany({
+      where: { workId },
+      select: { userId: true }
+    })
+    const alreadyAgreedIds = new Set(existingSupports.map(s => s.userId))
+
+    // Create supports for members who haven't agreed yet
+    const newAgreements: string[] = []
+    for (const member of allMembers) {
+      if (!alreadyAgreedIds.has(member.id)) {
+        await prisma.ideaSupport.create({
+          data: { workId, userId: member.id }
+        })
+        // Also remove any disagree from this member
+        await prisma.ideaDisagree.deleteMany({
+          where: { workId, userId: member.id }
+        })
+        newAgreements.push(member.name)
+      }
+    }
+
+    // Log the activity with clear attribution
+    const allNames = allMembers.map(m => m.name).join(', ')
+    await logActivity(
+      'ALL_AGREE_BY_ADMIN',
+      user.id,
+      workId,
+      `✅ All Agree used by Super Admin (${user.name}). All members marked as agreed: ${allNames}`
+    )
+
+    revalidatePath('/')
+    revalidatePath('/works')
+    return { success: true, agreedCount: newAgreements.length }
+  } catch (error: any) {
+    console.error('Failed to execute All Agree:', error)
+    return { success: false, error: `Database error: ${error.message || error}` }
+  }
+}
+
 export async function declineIdea(workId: string, reason: string) {
   const session = await getSession()
   if (!session) return { success: false, error: 'Unauthorized' }

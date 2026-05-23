@@ -5,9 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Lightbulb, Check, Plus, Clock, Calendar, 
   ThumbsUp, ThumbsDown, MessageSquare, CornerDownRight, Loader2, Play, ListOrdered, XCircle, Pause, RotateCcw, Trash2,
-  ChevronDown, ChevronUp, History, ArrowRightCircle, AlertTriangle, Archive, Edit2, Send
+  ChevronDown, ChevronUp, History, ArrowRightCircle, AlertTriangle, Archive, Edit2, Send, Users
 } from 'lucide-react'
-import { createWork, updateWorkStatus, toggleIdeaSupport, queueIdea, declineIdea, shelveIdea, reviveIdea, deleteIdea, editWork, getWorks, disagreeWithIdea, replyToDisagree, removeDisagree } from '@/app/actions'
+import { createWork, updateWorkStatus, toggleIdeaSupport, queueIdea, declineIdea, shelveIdea, reviveIdea, deleteIdea, editWork, getWorks, disagreeWithIdea, replyToDisagree, removeDisagree, adminAllAgree } from '@/app/actions'
 import { getMembers } from '@/app/actions/admin'
 import { useEffect } from 'react'
 import SectionGuide from './SectionGuide'
@@ -161,6 +161,9 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     loadData()
   }, [showAddForm])
 
+  // All Agree (Super Admin)
+  const [allAgreeId, setAllAgreeId] = useState<string | null>(null)
+
   // Delete confirmation
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
@@ -255,6 +258,19 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     try {
       const res = await action()
       if (res && !res.success) alert(res.error || 'Action failed')
+    } catch (err) { console.error(err) }
+    finally { setActionId(null) }
+  }
+
+  async function handleAllAgree(ideaId: string) {
+    setActionId(ideaId)
+    try {
+      const res = await adminAllAgree(ideaId)
+      if (res.success) {
+        setAllAgreeId(null)
+      } else {
+        alert(res.error || 'Failed to execute All Agree')
+      }
     } catch (err) { console.error(err) }
     finally { setActionId(null) }
   }
@@ -555,6 +571,37 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                   <span>{userDisagreed ? 'Disagreed' : 'Disagree'}</span>
                 </button>
                   </>
+                )}
+
+                {/* ALL AGREE — Super Admin Only */}
+                {isAdmin && approvalRate < 100 && (
+                  allAgreeId === idea.id ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleAllAgree(idea.id)}
+                        disabled={actionId === idea.id}
+                        className="text-xs bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 px-3 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none active:scale-95"
+                      >
+                        {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                        <span>Confirm All Agree</span>
+                      </button>
+                      <button
+                        onClick={() => setAllAgreeId(null)}
+                        className="text-xs bg-zinc-800/50 border border-white/10 text-zinc-400 p-2 rounded-xl hover:bg-zinc-700/50 transition-all cursor-pointer"
+                      >
+                        <XCircle size={12} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setAllAgreeId(idea.id)}
+                      className="text-xs bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border border-amber-500/25 text-amber-400 px-3 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none active:scale-95"
+                      title="Mark all members as agreed (Super Admin only). Each member's name will be shown, with a note that this was done via All Agree."
+                    >
+                      <Users size={12} />
+                      <span>All Agree</span>
+                    </button>
+                  )
                 )}
 
                 {canManage(idea) && (
