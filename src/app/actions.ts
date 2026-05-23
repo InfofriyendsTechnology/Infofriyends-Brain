@@ -565,6 +565,12 @@ export async function adminAllAgree(workId: string) {
       return { success: false, error: 'Can only use All Agree on open/queued proposals' }
     }
 
+    // Check if anyone has disagreed — if yes, block All Agree
+    const disagreeCount = await prisma.ideaDisagree.count({ where: { workId } })
+    if (disagreeCount > 0) {
+      return { success: false, error: 'Cannot use All Agree when someone has disagreed. Please resolve disagreements first.' }
+    }
+
     // Get all non-ADMIN members
     const allMembers = await prisma.user.findMany({
       where: { role: { not: 'ADMIN' } },
@@ -578,16 +584,12 @@ export async function adminAllAgree(workId: string) {
     })
     const alreadyAgreedIds = new Set(existingSupports.map(s => s.userId))
 
-    // Create supports for members who haven't agreed yet
+    // Create supports only for members who haven't agreed yet (pending members)
     const newAgreements: string[] = []
     for (const member of allMembers) {
       if (!alreadyAgreedIds.has(member.id)) {
         await prisma.ideaSupport.create({
           data: { workId, userId: member.id }
-        })
-        // Also remove any disagree from this member
-        await prisma.ideaDisagree.deleteMany({
-          where: { workId, userId: member.id }
         })
         newAgreements.push(member.name)
       }

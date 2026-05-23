@@ -573,8 +573,8 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                   </>
                 )}
 
-                {/* ALL AGREE — Super Admin Only */}
-                {isAdmin && approvalRate < 100 && (
+                {/* ALL AGREE — Super Admin Only, hidden if anyone has disagreed */}
+                {isAdmin && approvalRate < 100 && (!idea.disagrees || idea.disagrees.length === 0) && (
                   allAgreeId === idea.id ? (
                     <div className="flex items-center gap-1">
                       <button
