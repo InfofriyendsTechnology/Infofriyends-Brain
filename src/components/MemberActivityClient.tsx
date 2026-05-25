@@ -14,6 +14,7 @@ interface Work {
   name: string
   creatorId: string
   assigneeId: string | null
+  assignees?: { id: string; name: string }[]
   status: string
   priority: string
   createdAt: string
@@ -25,6 +26,7 @@ interface Member {
   name: string
   username: string
   role: string
+  customRole?: string | null
   profilePhoto: string | null
   createdAt: string
   lastActive: string | null
@@ -139,13 +141,14 @@ export default function MemberActivityClient({ members, works, currentUserId, cu
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -15 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-0 md:gap-6"
           >
             {sortedMembers.map((member, index) => {
-              const createdWorks = works.filter(w => w.creatorId === member.id)
-              const activeWorks = createdWorks.filter(w => w.status === 'ACTIVE')
-              const completedWorks = createdWorks.filter(w => w.status === 'COMPLETED')
-              const ideaWorks = createdWorks.filter(w => w.status === 'IDEA' || w.status === 'QUEUED')
+              const memberWorks = works.filter(w => (w.creatorId === member.id || w.assignees?.some((a: any) => a.id === member.id)) && w.status !== 'DELETED')
+              const activeWorks = memberWorks.filter(w => w.status === 'ACTIVE')
+              const completedWorks = memberWorks.filter(w => w.status === 'COMPLETED' || w.status === 'ARCHIVED')
+              const ideaWorks = works.filter(w => w.creatorId === member.id && (w.status === 'IDEA' || w.status === 'QUEUED'))
+              const createdWorks = works.filter(w => w.creatorId === member.id && w.status !== 'DELETED')
               const joinDate = new Date(member.createdAt)
               const lastActive = member.lastActive ? new Date(member.lastActive) : null
 
@@ -156,10 +159,10 @@ export default function MemberActivityClient({ members, works, currentUserId, cu
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: Math.min(index * 0.05, 0.4) }}
                   onClick={() => router.push(`/members/${member.id}`)}
-                  className={`group relative backdrop-blur-xl border rounded-3xl p-6 transition-all duration-300 flex flex-col justify-between cursor-pointer ${
+                  className={`group relative backdrop-blur-xl border-b md:border md:rounded-3xl p-4 md:p-6 transition-all duration-300 flex flex-col justify-between cursor-pointer ${
                     member.role === 'ADMIN'
-                      ? 'bg-gradient-to-b from-[#3188DA]/10 to-[#09090b]/40 border-[#63BDF2]/30 hover:border-[#63BDF2]/60 hover:shadow-[0_0_30px_-10px_rgba(99,189,242,0.2)]'
-                      : 'bg-zinc-900/10 border-white/5 hover:border-amber-500/20 hover:shadow-[0_0_30px_-10px_rgba(245,158,11,0.06)]'
+                      ? 'md:bg-gradient-to-b md:from-[#3188DA]/10 md:to-[#09090b]/40 border-[#63BDF2]/30 hover:border-[#63BDF2]/60 hover:shadow-[0_0_30px_-10px_rgba(99,189,242,0.2)]'
+                      : 'md:bg-zinc-900/10 border-white/5 hover:border-amber-500/20 hover:shadow-[0_0_30px_-10px_rgba(245,158,11,0.06)]'
                   }`}
                 >
                   <div className="space-y-5">
@@ -190,7 +193,18 @@ export default function MemberActivityClient({ members, works, currentUserId, cu
                         </div>
                         <div className="min-w-0">
                           <h3 className={`text-base font-bold transition-colors capitalize truncate ${member.role === 'ADMIN' ? 'text-white group-hover:text-[#63BDF2]' : 'text-white group-hover:text-amber-400'}`}>{member.name}</h3>
-                          <span className="text-xs text-zinc-500 font-mono">@{member.username}</span>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                            <span className="text-xs text-zinc-500 font-mono">@{member.username}</span>
+                            <span className={`text-[8px] px-1 rounded uppercase font-black tracking-wide ${
+                              member.role === 'ADMIN' 
+                                ? 'bg-[#63BDF2]/10 text-[#63BDF2]' 
+                                : member.role === 'NEUTRAL'
+                                ? 'bg-purple-500/10 text-purple-400'
+                                : 'bg-zinc-800 text-zinc-400'
+                            }`}>
+                              {member.customRole || member.role}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
@@ -299,11 +313,12 @@ export default function MemberActivityClient({ members, works, currentUserId, cu
               </thead>
               <tbody className="divide-y divide-white/5 text-sm text-zinc-300 font-medium">
                 {sortedMembers.map((member) => {
-                  const createdWorks = works.filter(w => w.creatorId === member.id)
-                  const activeWorks = createdWorks.filter(w => w.status === 'ACTIVE')
-                  const completedWorks = createdWorks.filter(w => w.status === 'COMPLETED')
-                  const ideaWorks = createdWorks.filter(w => w.status === 'IDEA' || w.status === 'QUEUED')
-                  const latestWork = createdWorks[0]
+                  const memberWorks = works.filter(w => (w.creatorId === member.id || w.assignees?.some((a: any) => a.id === member.id)) && w.status !== 'DELETED')
+                  const activeWorks = memberWorks.filter(w => w.status === 'ACTIVE')
+                  const completedWorks = memberWorks.filter(w => w.status === 'COMPLETED' || w.status === 'ARCHIVED')
+                  const ideaWorks = works.filter(w => w.creatorId === member.id && (w.status === 'IDEA' || w.status === 'QUEUED'))
+                  const createdWorks = works.filter(w => w.creatorId === member.id && w.status !== 'DELETED')
+                  const latestWork = memberWorks[0]
 
                   return (
                       <tr 
@@ -329,8 +344,17 @@ export default function MemberActivityClient({ members, works, currentUserId, cu
                             )}
                           </div>
                           <div>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span className={`font-bold capitalize leading-tight ${member.role === 'ADMIN' ? 'text-white' : 'text-white'}`}>{member.name}</span>
+                              <span className={`text-[8px] px-1.5 py-0.2 rounded uppercase font-black tracking-wide ${
+                                member.role === 'ADMIN' 
+                                  ? 'bg-[#63BDF2]/10 text-[#63BDF2]' 
+                                  : member.role === 'NEUTRAL'
+                                  ? 'bg-purple-500/10 text-purple-400'
+                                  : 'bg-zinc-800 text-zinc-400'
+                              }`}>
+                                {member.customRole || member.role}
+                              </span>
                             </div>
                             <span className="text-[10px] text-zinc-500 font-mono block">@{member.username}</span>
                             {currentUserRole === 'ADMIN' && member.id !== currentUserId && member.role !== 'ADMIN' && (

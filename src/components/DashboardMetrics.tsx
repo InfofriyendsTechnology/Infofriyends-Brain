@@ -14,16 +14,6 @@ interface MemberInfo {
   completedWorksCount?: number
 }
 
-function getRelativeTime(dateStr: string) {
-  const diff = new Date().getTime() - new Date(dateStr).getTime()
-  const mins = Math.round(diff / (1000 * 60))
-  if (mins < 1) return 'Just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.round(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.round(hours / 24)}d ago`
-}
-
 function getActiveMembers(members: MemberInfo[]) {
   const now = new Date()
   // A member is "active" if they were active within the last 24 hours
@@ -67,16 +57,6 @@ export default function DashboardMetrics({
   const totalNonAdmin = members.filter(m => m.role !== 'ADMIN').length
   const avgHours = getAvgActiveHours(members)
 
-  const sortedNonAdmins = [...members]
-    .filter(m => m.role !== 'ADMIN')
-    .sort((a, b) => (b.contributionScore || 0) - (a.contributionScore || 0))
-
-  const activeMembersSorted = [...activeMembers].sort((a, b) => {
-    const rankA = sortedNonAdmins.findIndex(x => x.id === a.id)
-    const rankB = sortedNonAdmins.findIndex(x => x.id === b.id)
-    return rankA - rankB
-  })
-
   const metrics = [
     {
       title: 'Active Work',
@@ -108,8 +88,7 @@ export default function DashboardMetrics({
       icon: <Users className="text-amber-400" size={20} />,
       bgColor: 'bg-amber-500/10',
       borderColor: 'border-amber-500/20',
-      description: `of ${totalNonAdmin} • ~${avgHours}h avg today`,
-      extra: activeMembers.length > 0 ? activeMembers : null
+      description: `of ${totalNonAdmin} • ~${avgHours}h avg today`
     }
   ]
 

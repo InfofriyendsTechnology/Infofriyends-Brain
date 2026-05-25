@@ -7,12 +7,18 @@ import { ArrowLeft, Briefcase } from 'lucide-react'
 import ImpersonateButton from '@/components/ImpersonateButton'
 import WorkCard from '@/components/WorkCard'
 
+import { redirect } from 'next/navigation'
+
 export const dynamic = 'force-dynamic'
 
 export default async function MemberProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   
   const session = await getSession()
+  if (!session) {
+    redirect('/login')
+  }
+  
   const members = await getMembers()
   const works = await getWorks()
   
@@ -22,7 +28,7 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
     notFound()
   }
 
-  const memberWorks = works.filter((w: any) => w.creatorId === member.id)
+  const memberWorks = works.filter((w: any) => w.creatorId === member.id && w.status !== 'DELETED')
   const activeWorks = memberWorks.filter((w: any) => w.status === 'ACTIVE')
   
   return (

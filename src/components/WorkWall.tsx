@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Search, FolderGit2, SlidersHorizontal, Grid, List, CheckCircle2, 
-  Circle, Archive, AlertTriangle, User, ShieldAlert, Sparkles, Filter, Loader2, Plus 
+  Archive, AlertTriangle, User, Loader2, Plus 
 } from 'lucide-react'
 import WorkCard from './WorkCard'
 import { updateWorkStatus } from '@/app/actions'
@@ -82,6 +83,9 @@ function CustomDropdown({
 }
 
 export default function WorkWall({ works, currentUser }: { works: any[], currentUser: any }) {
+  const router = useRouter()
+  const { setAddWorkModalOpen, addToast, showConfirm } = useStore()
+
   const [activeScope, setActiveScope] = useState<'all' | 'focus'>('all')
   const [statusFilter, setStatusFilter] = useState('ALL') // ALL, IDEA, ACTIVE, BLOCKED, COMPLETED, ARCHIVED
   const [priorityFilter, setPriorityFilter] = useState('ALL') // ALL, LOW, MEDIUM, HIGH, URGENT
@@ -91,7 +95,10 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
   const [members, setMembers] = useState<any[]>([])
   const [isUpdatingRow, setIsUpdatingRow] = useState<string | null>(null)
   const [openDropdown, setOpenDropdown] = useState<'status' | 'priority' | 'member' | null>(null)
-  const { setAddWorkModalOpen } = useStore()
+
+  const [completeWorkId, setCompleteWorkId] = useState<string | null>(null)
+  const [actualDays, setActualDays] = useState<number | ''>('')
+  const [actualHours, setActualHours] = useState<number | ''>('')
 
   const statusOptions = [
     { value: 'ALL', label: 'All Statuses' },
@@ -167,9 +174,44 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
   const handleTableRowStatusChange = async (id: string, newStatus: string) => {
     setIsUpdatingRow(id)
     try {
-      await updateWorkStatus(id, newStatus)
-    } catch (e) {
+      const res = await updateWorkStatus(id, newStatus)
+      if (res && !res.success) {
+        addToast(res.error || `Failed to update status to ${newStatus}`, 'error')
+      } else {
+        addToast(`Status updated to ${newStatus}`, 'success')
+        router.refresh()
+      }
+    } catch (e: any) {
       console.error(e)
+      addToast(e.message || 'An error occurred', 'error')
+    } finally {
+      setIsUpdatingRow(null)
+    }
+  }
+
+  const handleTableCompleteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!completeWorkId || (actualDays === '' && actualHours === '')) return
+    setIsUpdatingRow(completeWorkId)
+    
+    const d = actualDays !== '' ? Number(actualDays) : 0
+    const h = actualHours !== '' ? Number(actualHours) : 0
+    const totalActual = (d * 5) + h
+    
+    try {
+      const res = await updateWorkStatus(completeWorkId, 'COMPLETED', undefined, totalActual)
+      if (res && !res.success) {
+        addToast(res.error || 'Failed to complete work', 'error')
+      } else {
+        addToast('Work successfully completed! Points awarded!', 'success')
+        setCompleteWorkId(null)
+        setActualDays('')
+        setActualHours('')
+        router.refresh()
+      }
+    } catch (e: any) {
+      console.error(e)
+      addToast(e.message || 'An error occurred', 'error')
     } finally {
       setIsUpdatingRow(null)
     }
@@ -349,7 +391,7 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
           <div className={viewMode === 'grid' ? 'block' : 'block md:hidden'}>
             <motion.div 
               layout
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 md:gap-6"
             >
               <AnimatePresence mode="popLayout">
                 {filteredWorks.map(work => (
@@ -505,7 +547,7 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
                                     )}
                                     {!isRowCompleted && !isRowArchived && (
                                       <button 
-                                        onClick={() => handleTableRowStatusChange(work.id, 'COMPLETED')}
+                                        onClick={() => setCompleteWorkId(work.id)}
                                         className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/25 px-2 py-0.5 rounded text-[9px] font-bold uppercase"
                                       >
                                         Complete
@@ -544,6 +586,89 @@ export default function WorkWall({ works, currentUser }: { works: any[], current
           )}
         </>
       )}
+
+      {/* Table Complete Duration Modal Overlay */}
+      <AnimatePresence>
+        {completeWorkId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setCompleteWorkId(null)}
+              className="absolute inset-0 bg-[#09090b]/80 backdrop-blur-md"
+            />
+            
+            {/* Modal Box */}
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-sm bg-[#0d0e12] border border-emerald-500/20 rounded-3xl p-6 md:p-8 shadow-2xl select-none"
+            >
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl">
+                  <CheckCircle2 size={28} />
+                </div>
+                
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-white">Complete Work Item</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Specify the exact time duration taken to finish this task.
+                  </p>
+                </div>
+
+                <form onSubmit={handleTableCompleteSubmit} className="w-full space-y-4 pt-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[9px] uppercase font-bold text-emerald-500 text-left block">Days</label>
+                      <input 
+                        type="number"
+                        min="0"
+                        value={actualDays}
+                        onChange={(e) => setActualDays(e.target.value ? Number(e.target.value) : '')}
+                        placeholder="Days"
+                        className="w-full bg-[#0c0d12]/60 border border-emerald-500/30 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-emerald-500/70"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] uppercase font-bold text-emerald-500 text-left block">Hours</label>
+                      <input 
+                        type="number"
+                        min="0"
+                        value={actualHours}
+                        onChange={(e) => setActualHours(e.target.value ? Number(e.target.value) : '')}
+                        placeholder="Hours"
+                        className="w-full bg-[#0c0d12]/60 border border-emerald-500/30 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-emerald-500/70"
+                      />
+                    </div>
+                  </div>
+
+                  <p className="text-[8px] text-emerald-500/70 font-bold text-left">*Your final points will be (Days × 5) + Hours.</p>
+
+                  <div className="flex gap-3 w-full pt-4">
+                    <button 
+                      type="button"
+                      onClick={() => setCompleteWorkId(null)}
+                      className="flex-1 bg-white/5 hover:bg-white/10 border border-white/5 text-white py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      type="submit"
+                      disabled={actualDays === '' && actualHours === ''}
+                      className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-black py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      Confirm Finish
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

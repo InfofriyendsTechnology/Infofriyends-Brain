@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { HelpCircle, Terminal, Cpu, ShieldAlert, Award, FolderGit2, ArrowRight, Zap, CheckCircle2 } from 'lucide-react'
+import { HelpCircle, Terminal, Cpu, Award, Zap } from 'lucide-react'
 
 export default function HowItWorksDocs() {
   const [activeTab, setActiveTab] = useState('Overview')

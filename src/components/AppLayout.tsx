@@ -1,15 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
 import { useStore } from '@/store/useStore'
-import { Plus, HelpCircle, Notebook, LogOut } from 'lucide-react'
-import { AnimatePresence } from 'framer-motion'
+import { Plus, HelpCircle, Notebook, LogOut, Loader2 } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
 import HelpGuideModal from './HelpGuideModal'
 import NotificationsDropdown from './NotificationsDropdown'
 import NotesDrawer from './NotesDrawer'
 import { revertImpersonationAction } from '@/app/actions/admin'
+import ToastContainer from './ToastContainer'
+import ConfirmModal from './ConfirmModal'
 
 export default function AppLayout({ children, session }: { children: React.ReactNode, session: any }) {
   const pathname = usePathname()
@@ -18,6 +20,49 @@ export default function AppLayout({ children, session }: { children: React.React
   const { isNavbarHidden, setAddWorkModalOpen } = useStore()
   const [isHelpOpen, setIsHelpOpen] = useState(false)
   const [isNotesOpen, setIsNotesOpen] = useState(false)
+  const [isReverting, setIsReverting] = useState(false)
+  const [isNavigating, setIsNavigating] = useState(false)
+
+  // Detect route change start via link clicks
+  useEffect(() => {
+    const handleLinkClick = (e: MouseEvent) => {
+      let target = e.target as HTMLElement | null
+      while (target && target.tagName !== 'A') {
+        target = target.parentElement
+      }
+
+      if (target && target.tagName === 'A') {
+        const href = target.getAttribute('href')
+        const targetAttr = target.getAttribute('target')
+        
+        if (
+          href && 
+          href.startsWith('/') && 
+          !href.startsWith('/#') && 
+          targetAttr !== '_blank' && 
+          !e.defaultPrevented &&
+          e.button === 0 &&
+          !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey
+        ) {
+          // Verify that we're actually going to a different route
+          const currentPath = window.location.pathname
+          if (href !== currentPath) {
+            setIsNavigating(true)
+          }
+        }
+      }
+    }
+
+    document.addEventListener('click', handleLinkClick, { capture: true })
+    return () => {
+      document.removeEventListener('click', handleLinkClick, { capture: true })
+    }
+  }, [])
+
+  // Terminate loading state on pathname change
+  useEffect(() => {
+    setIsNavigating(false)
+  }, [pathname])
 
   if (isLoginPage) {
     return (
@@ -39,6 +84,29 @@ export default function AppLayout({ children, session }: { children: React.React
 
   return (
     <div className="min-h-screen bg-background text-foreground h-[100dvh] overflow-hidden flex flex-col lg:flex-row">
+      {/* Route Change Loading Bar */}
+      <AnimatePresence>
+        {isNavigating && (
+          <motion.div
+            initial={{ width: '0%', opacity: 1 }}
+            animate={{ 
+              width: ['0%', '30%', '70%', '90%'],
+              transition: { 
+                times: [0, 0.2, 0.6, 1],
+                duration: 8, 
+                ease: 'easeOut' 
+              } 
+            }}
+            exit={{ 
+              width: '100%', 
+              opacity: 0,
+              transition: { duration: 0.25, ease: 'easeOut' }
+            }}
+            className="fixed top-0 left-0 h-[3px] bg-gradient-to-r from-[#63BDF2] via-[#3188DA] to-emerald-400 z-50 shadow-[0_0_10px_rgba(99,189,242,0.5)]"
+          />
+        )}
+      </AnimatePresence>
+
       <Sidebar session={session} />
       <main className="flex-1 h-full lg:pl-72 overflow-hidden flex flex-col relative">
         <div className={`flex-1 w-full h-full min-h-0 flex flex-col ${isChatPage ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar'} ${mainPaddingClass} transition-all duration-300`}>
@@ -53,12 +121,14 @@ export default function AppLayout({ children, session }: { children: React.React
             </span>
             <button
               onClick={async () => {
+                setIsReverting(true)
                 await revertImpersonationAction()
                 window.location.href = '/' // Force full reload to reset state
               }}
-              className="text-xs bg-red-500 text-white px-3 py-1.5 rounded-full font-bold hover:bg-red-600 transition-colors flex items-center gap-1.5"
+              disabled={isReverting}
+              className="text-xs bg-red-500 text-white px-3 py-1.5 rounded-full font-bold hover:bg-red-600 transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
             >
-              <LogOut size={12} />
+              {isReverting ? <Loader2 size={12} className="animate-spin" /> : <LogOut size={12} />}
               Back to Admin
             </button>
           </div>
@@ -115,6 +185,10 @@ export default function AppLayout({ children, session }: { children: React.React
           <Plus size={20} className="stroke-[3px]" />
         </button>
       )}
+
+      {/* Global Overlays */}
+      <ToastContainer />
+      <ConfirmModal />
     </div>
   )
 }

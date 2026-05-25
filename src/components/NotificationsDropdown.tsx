@@ -10,7 +10,8 @@ import {
   AlertTriangle, 
   Clock, 
   Inbox,
-  Sparkles
+  Sparkles,
+  Loader2
 } from 'lucide-react'
 import { 
   getNotificationsAction, 
@@ -18,6 +19,7 @@ import {
   markAllNotificationsReadAction, 
   deleteNotificationAction 
 } from '@/app/actions/notifications'
+import { useStore } from '@/store/useStore'
 
 interface NotificationItem {
   id: string
@@ -32,6 +34,11 @@ export default function NotificationsDropdown() {
   const [isOpen, setIsOpen] = useState(false)
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [loading, setLoading] = useState(false)
+
+  const [readingId, setReadingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [isClearingAll, setIsClearingAll] = useState(false)
+  const { addToast, showConfirm } = useStore()
 
   const fetchNotifications = async () => {
     setLoading(true)
@@ -65,38 +72,69 @@ export default function NotificationsDropdown() {
 
   const handleMarkRead = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
+    setReadingId(id)
     try {
       const res = await markNotificationReadAction(id)
       if (res.success) {
+        addToast('Notification marked as read', 'success')
         setNotifications(prev => 
           prev.map(n => n.id === id ? { ...n, isRead: true } : n)
         )
+      } else {
+        addToast(res.error || 'Failed to mark read', 'error')
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
+      addToast(err.message || 'An error occurred', 'error')
+    } finally {
+      setReadingId(null)
     }
   }
 
   const handleMarkAllRead = async () => {
+    setIsClearingAll(true)
     try {
       const res = await markAllNotificationsReadAction()
       if (res.success) {
+        addToast('All notifications marked as read', 'success')
         setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
+      } else {
+        addToast(res.error || 'Failed to clear notifications', 'error')
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
+      addToast(err.message || 'An error occurred', 'error')
+    } finally {
+      setIsClearingAll(false)
     }
   }
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
+    const item = notifications.find(n => n.id === id)
+    const titleText = item?.title || 'this alert'
+    const confirmed = await showConfirm({
+      title: 'Delete Notification',
+      message: `Are you sure you want to delete "${titleText}"?`,
+      confirmText: 'Delete Alert',
+      danger: true
+    })
+    if (!confirmed) return
+
+    setDeletingId(id)
     try {
       const res = await deleteNotificationAction(id)
       if (res.success) {
+        addToast('Notification deleted', 'success')
         setNotifications(prev => prev.filter(n => n.id !== id))
+      } else {
+        addToast(res.error || 'Failed to delete notification', 'error')
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
+      addToast(err.message || 'An error occurred', 'error')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -150,8 +188,10 @@ export default function NotificationsDropdown() {
                 {unreadCount > 0 && (
                   <button
                     onClick={handleMarkAllRead}
-                    className="text-[10px] text-[#63BDF2] hover:text-[#3188DA] font-bold cursor-pointer transition-colors"
+                    disabled={isClearingAll}
+                    className="text-[10px] text-[#63BDF2] hover:text-[#3188DA] font-bold cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1"
                   >
+                    {isClearingAll && <Loader2 size={10} className="animate-spin" />}
                     Clear Unread
                   </button>
                 )}
@@ -159,7 +199,12 @@ export default function NotificationsDropdown() {
 
               {/* Notifications List */}
               <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1 bg-zinc-950/10">
-                {notifications.length === 0 ? (
+                {loading && notifications.length === 0 ? (
+                  <div className="py-12 flex flex-col items-center justify-center text-zinc-500 gap-3">
+                    <Loader2 size={20} className="animate-spin text-[#63BDF2]" />
+                    <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">Checking Inbox...</p>
+                  </div>
+                ) : notifications.length === 0 ? (
                   <div className="py-12 flex flex-col items-center justify-center text-zinc-500 gap-2.5">
                     <div className="bg-white/5 p-3 rounded-2xl border border-white/5 text-zinc-400">
                       <Inbox size={20} />
@@ -218,22 +263,24 @@ export default function NotificationsDropdown() {
                       </div>
 
                       {/* Hover Actions */}
-                      <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className={`absolute right-2 top-2 flex items-center gap-1 transition-opacity ${readingId === item.id || deletingId === item.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                         {!item.isRead && (
                           <button
                             onClick={(e) => handleMarkRead(item.id, e)}
-                            className="p-1 bg-[#63BDF2]/15 text-[#63BDF2] hover:bg-[#63BDF2]/25 rounded-md transition-colors cursor-pointer"
+                            disabled={readingId === item.id}
+                            className="p-1 bg-[#63BDF2]/15 text-[#63BDF2] hover:bg-[#63BDF2]/25 rounded-md transition-colors cursor-pointer disabled:opacity-50"
                             title="Mark as read"
                           >
-                            <Check size={10} className="stroke-[3px]" />
+                            {readingId === item.id ? <Loader2 size={10} className="animate-spin text-[#63BDF2]" /> : <Check size={10} className="stroke-[3px]" />}
                           </button>
                         )}
                         <button
                           onClick={(e) => handleDelete(item.id, e)}
-                          className="p-1 bg-red-500/15 text-red-400 hover:bg-red-500/25 rounded-md transition-colors cursor-pointer"
+                          disabled={deletingId === item.id}
+                          className="p-1 bg-red-500/15 text-red-400 hover:bg-red-500/25 rounded-md transition-colors cursor-pointer disabled:opacity-50"
                           title="Delete"
                         >
-                          <Trash2 size={10} />
+                          {deletingId === item.id ? <Loader2 size={10} className="animate-spin text-red-400" /> : <Trash2 size={10} />}
                         </button>
                       </div>
                     </motion.div>

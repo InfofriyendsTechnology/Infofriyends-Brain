@@ -21,6 +21,7 @@ interface Message {
     id: string
     name: string
     role: string
+    customRole?: string | null
     profilePhoto: string | null
   }
 }
@@ -29,6 +30,7 @@ interface TeamMember {
   id: string
   name: string
   role: string
+  customRole?: string | null
   profilePhoto: string | null
   isOnline: boolean
   lastActive: string | Date | null
@@ -174,6 +176,7 @@ export default function ChatClient({
         id: currentUser.id,
         name: currentUser.name,
         role: currentUser.role,
+        customRole: currentUser.customRole || null,
         profilePhoto: currentUser.profilePhoto || null
       }
     }
@@ -452,7 +455,7 @@ export default function ChatClient({
                           isAdmin ? 'bg-[#3188DA]/10 border border-[#3188DA]/25 text-[#63BDF2]' : 'bg-emerald-500/10 border border-emerald-500/25 text-emerald-400'
                         }`}>
                           {isAdmin ? <ShieldCheck size={7} /> : <User size={7} />}
-                          {m.user.role}
+                          {m.user.customRole || m.user.role}
                         </span>
                       </div>
                     )}
@@ -511,7 +514,7 @@ export default function ChatClient({
               disabled={!inputText.trim() || isSending || !activeChannel}
               className="p-3 bg-white text-black hover:bg-white/90 rounded-xl transition-all cursor-pointer shadow-lg shadow-white/5 shrink-0 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <Send size={14} className="shrink-0" />
+              {isSending ? <Loader2 size={14} className="animate-spin text-black" /> : <Send size={14} className="shrink-0" />}
             </button>
           </form>
         </div>

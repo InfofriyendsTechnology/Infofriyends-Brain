@@ -52,7 +52,14 @@ export async function loginAction(formData: FormData) {
       return { success: false, error: 'Invalid credentials' }
     }
 
-    await login({ id: user.id, role: user.role, name: user.name, username: user.username })
+    await login({ 
+      id: user.id, 
+      role: user.role, 
+      name: user.name, 
+      username: user.username,
+      customRole: user.customRole,
+      profilePhoto: user.profilePhoto
+    })
     return { success: true }
   } catch (error: any) {
     console.error('Login error:', error)

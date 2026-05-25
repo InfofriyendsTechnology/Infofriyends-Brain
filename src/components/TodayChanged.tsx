@@ -1,25 +1,40 @@
 'use client'
 
 import { createCommunityPost } from '@/app/actions'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { useStore } from '@/store/useStore'
 import { motion } from 'framer-motion'
 import { Send, ArrowUpRight, Lightbulb, Zap, Activity, Loader2 } from 'lucide-react'
 
 export default function TodayChanged({ posts, currentUser }: { posts: any[], currentUser: any }) {
+  const router = useRouter()
+  const { addToast } = useStore()
+  const formRef = useRef<HTMLFormElement>(null)
+
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [postType, setPostType] = useState('UPDATE')
 
   async function handleSubmit(formData: FormData) {
-    if (!currentUser) return alert('Please login to post')
+    if (!currentUser) {
+      addToast('Please login to post', 'error')
+      return
+    }
     
     setIsSubmitting(true)
     formData.append('type', postType)
     try {
-      await createCommunityPost(formData)
-      const form = document.getElementById('community-post-form') as HTMLFormElement
-      if (form) form.reset()
-    } catch (error) {
+      const res = await createCommunityPost(formData)
+      if (res && !res.success) {
+        addToast(res.error || 'Failed to create post', 'error')
+      } else {
+        addToast('Community post shared!', 'success')
+        if (formRef.current) formRef.current.reset()
+        router.refresh()
+      }
+    } catch (error: any) {
       console.error(error)
+      addToast(error.message || 'An error occurred', 'error')
     } finally {
       setIsSubmitting(false)
     }
@@ -55,7 +70,7 @@ export default function TodayChanged({ posts, currentUser }: { posts: any[], cur
       <div className="flex flex-col gap-8">
         {/* Form Section */}
         <div className="w-full">
-          <form id="community-post-form" action={handleSubmit} className="space-y-4">
+          <form ref={formRef} action={handleSubmit} className="space-y-4">
             
             <div className="space-y-2">
               <label className="text-sm font-semibold text-white/90">Post Type</label>

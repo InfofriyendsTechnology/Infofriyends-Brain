@@ -1,15 +1,21 @@
 'use client'
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { updateWorkStatus, addWorkUpdate, editWork, logWorkTime } from '@/app/actions'
-import { useState } from 'react'
+import { updateWorkStatus, addWorkUpdate, editWork } from '@/app/actions'
+import { useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { useStore } from '@/store/useStore'
 import { 
   CheckCircle2, Circle, Archive, Clock, ShieldAlert, Sparkles, 
   User, ChevronDown, ChevronUp, AlertTriangle, MessageSquare, Plus, Loader2, Lightbulb, Zap, Trash2, Edit2, X
 } from 'lucide-react'
-
+import CustomSelect from './CustomSelect'
 export default function WorkCard({ work, currentUser }: { work: any, currentUser: any }) {
+  const router = useRouter()
+  const { addToast, showConfirm } = useStore()
+
   const [isUpdating, setIsUpdating] = useState(false)
+  const [activeAction, setActiveAction] = useState<string | null>(null)
   const [isPostingUpdate, setIsPostingUpdate] = useState(false)
   const [newUpdate, setNewUpdate] = useState('')
   const [isExpanded, setIsExpanded] = useState(false)
@@ -25,9 +31,10 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
   const [showDeleteInput, setShowDeleteInput] = useState(false)
   const [deleteReason, setDeleteReason] = useState('')
 
-  // Time Logging State
-  const [showTimeLog, setShowTimeLog] = useState(false)
-  const [timeHours, setTimeHours] = useState('')
+  // Completion Modal State
+  const [showCompleteModal, setShowCompleteModal] = useState(false)
+  const [actualDays, setActualDays] = useState<number | ''>('')
+  const [actualHours, setActualHours] = useState<number | ''>('')
 
   const isCompleted = work.status === 'COMPLETED'
   const isArchived = work.status === 'ARCHIVED'
@@ -40,40 +47,74 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
                       (work.personMentions?.length ? 10 : 0) + 
                       (work.parentWorkId ? 10 : 0)
 
+  const calculatePoints = (days: number | '', hours: number | '') => {
+    const d = days !== '' ? Number(days) : 0
+    const h = hours !== '' ? Number(hours) : 0
+    const totalHours = (d * 24) + h
+    const pDays = Math.floor(totalHours / 24)
+    const pHours = totalHours % 24
+    const extraPoints = pHours >= 4 ? 5 : pHours >= 2 ? 2 : pHours >= 1 ? 1 : 0
+    return (pDays * 5) + extraPoints
+  }
+
   const isAdmin = currentUser?.role === 'ADMIN'
   const isCreatorOrAssignee = currentUser && (work.creatorId === currentUser.id || work.assignees?.some((a: any) => a.id === currentUser.id))
   const isAuthorized = isAdmin || isCreatorOrAssignee
+
+  const stopDurationInputRef = useRef<HTMLInputElement>(null)
 
   const handleStatusChange = async (newStatus: string, reason?: string) => {
     if (!isAuthorized) return
     setIsUpdating(true)
     try {
-      await updateWorkStatus(work.id, newStatus, reason)
-    } catch (e) {
+      const res = await updateWorkStatus(work.id, newStatus, reason)
+      if (res && !res.success) {
+        addToast(res.error || `Failed to update status to ${newStatus}`, 'error')
+      } else {
+        addToast(`Work status successfully updated to ${newStatus}`, 'success')
+        router.refresh()
+      }
+    } catch (e: any) {
       console.error(e)
+      addToast(e.message || 'An error occurred', 'error')
     } finally {
       setIsUpdating(false)
+      setActiveAction(null)
       setShowBlockInput(false)
     }
   }
 
-  const handleTimeLogSubmit = async () => {
-    const hours = parseFloat(timeHours)
-    if (isNaN(hours) || hours <= 0) return
+  const submitCompleteWork = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!isAuthorized || (actualDays === '' && actualHours === '')) return
     setIsUpdating(true)
+    setActiveAction('COMPLETE')
+    
+    const d = actualDays !== '' ? Number(actualDays) : 0
+    const h = actualHours !== '' ? Number(actualHours) : 0
+    const totalActual = (d * 24) + h
+    
     try {
-      await logWorkTime(work.id, hours)
-      setShowTimeLog(false)
-      setTimeHours('')
-    } catch (e) {
+      const res = await updateWorkStatus(work.id, 'COMPLETED', undefined, totalActual)
+      if (res && !res.success) {
+        addToast(res.error || 'Failed to complete work', 'error')
+      } else {
+        addToast('Work successfully completed! Points awarded!', 'success')
+        setShowCompleteModal(false)
+        router.refresh()
+      }
+    } catch (e: any) {
       console.error(e)
+      addToast(e.message || 'An error occurred during completion', 'error')
     } finally {
       setIsUpdating(false)
+      setActiveAction(null)
     }
   }
 
   const submitBlockedState = () => {
     if (!blockReason.trim()) return
+    setActiveAction('STOP')
     handleStatusChange('BLOCKED', blockReason)
   }
 
@@ -84,9 +125,14 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
       const res = await addWorkUpdate(work.id, newUpdate.trim())
       if (res && res.success) {
         setNewUpdate('')
+        addToast('Update posted successfully', 'success')
+        router.refresh()
+      } else {
+        addToast(res?.error || 'Failed to post update', 'error')
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e)
+      addToast(e.message || 'An error occurred', 'error')
     } finally {
       setIsPostingUpdate(false)
     }
@@ -96,6 +142,7 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
     e.preventDefault()
     if (!editName.trim() || !editDesc.trim()) return
     setIsUpdating(true)
+    setActiveAction('EDIT')
     try {
       const formData = new FormData()
       formData.append('name', editName)
@@ -108,23 +155,34 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
       
       const res = await editWork(work.id, formData)
       if (res.success) {
+        addToast('Work updated successfully', 'success')
         setIsEditing(false)
+        router.refresh()
       } else {
-        alert(res.error)
+        addToast(res.error || 'Failed to edit work', 'error')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
+      addToast(error.message || 'An error occurred during edit', 'error')
     } finally {
       setIsUpdating(false)
+      setActiveAction(null)
     }
   }
 
   const handleFastUpdate = async (suggestion: string) => {
     setIsPostingUpdate(true)
     try {
-      await addWorkUpdate(work.id, suggestion)
-    } catch (e) {
+      const res = await addWorkUpdate(work.id, suggestion)
+      if (res && res.success) {
+        addToast('Quick update posted', 'success')
+        router.refresh()
+      } else {
+        addToast(res?.error || 'Failed to post update', 'error')
+      }
+    } catch (e: any) {
       console.error(e)
+      addToast(e.message || 'An error occurred', 'error')
     } finally {
       setIsPostingUpdate(false)
     }
@@ -157,6 +215,18 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
           </span>
         )
     }
+  }
+
+  const getTypeBadge = () => {
+    return (
+      <span className={`inline-flex items-center text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+        work.type === 'ACTION' 
+          ? 'text-cyan-400 bg-cyan-500/10 border border-cyan-500/20'
+          : 'text-fuchsia-400 bg-fuchsia-500/10 border border-fuchsia-500/20'
+      }`}>
+        {work.type === 'ACTION' ? 'Action' : 'Idea'}
+      </span>
+    )
   }
 
   const getStatusBadge = () => {
@@ -240,16 +310,16 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className={`relative group p-6 rounded-3xl border transition-all duration-300 flex flex-col h-full overflow-hidden bg-gradient-to-br ${
+      className={`relative group p-4 md:p-6 md:rounded-3xl transition-all duration-300 flex flex-col h-full overflow-hidden border-b border-white/5 md:border md:bg-gradient-to-br ${
         isDeleted
-          ? 'from-red-950/20 via-[#0d0e12] to-red-950/10 border-red-900/50 opacity-60 grayscale'
+          ? 'md:from-red-950/20 md:via-[#0d0e12] md:to-red-950/10 md:border-red-900/50 opacity-60 grayscale'
           : isCompleted 
-            ? 'from-secondary/15 via-[#0d0e12] to-secondary/10 border-emerald-500/20 shadow-lg shadow-emerald-500/5' 
+            ? 'md:from-secondary/15 md:via-[#0d0e12] md:to-secondary/10 md:border-emerald-500/20 shadow-lg shadow-emerald-500/5' 
             : isArchived
-              ? 'from-transparent to-transparent border-dashed border-white/5 opacity-55'
+              ? 'md:from-transparent md:to-transparent border-dashed md:border-white/5 opacity-55'
               : isBlocked
-                ? 'from-red-950/5 via-[#0d0e12] to-red-950/0 border-red-500/30'
-                : 'from-[#0d0e12] via-[#09090b] to-secondary/20 border-white/10 hover:border-[#63BDF2]/40 hover:shadow-2xl hover:shadow-[#63BDF2]/5'
+                ? 'md:from-red-950/5 md:via-[#0d0e12] md:to-red-950/0 md:border-red-500/30'
+                : 'md:from-[#0d0e12] md:via-[#09090b] md:to-secondary/20 md:border-white/10 hover:border-[#63BDF2]/40 hover:shadow-2xl hover:shadow-[#63BDF2]/5'
       }`}
     >
       {/* Decorative Glow */}
@@ -263,6 +333,7 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-1.5 flex-wrap">
             {getStatusBadge()}
+            {getTypeBadge()}
             {getPriorityBadge()}
           </div>
           {totalPoints > 0 && (
@@ -291,12 +362,15 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
             />
             <div className="flex justify-end gap-2 pt-1">
               <button type="button" onClick={() => setIsEditing(false)} className="text-[10px] text-zinc-400 hover:text-white px-2 py-1">Cancel</button>
-              <button type="submit" disabled={isUpdating} className="bg-[#63BDF2] text-black px-3 py-1 text-[10px] font-black rounded-lg hover:bg-[#3188DA]">Save</button>
+              <button type="submit" disabled={isUpdating} className="bg-[#63BDF2] text-black px-3 py-1 text-[10px] font-black rounded-lg hover:bg-[#3188DA] flex items-center gap-1 cursor-pointer disabled:opacity-50">
+                {activeAction === 'EDIT' ? <Loader2 size={10} className="animate-spin" /> : null}
+                Save
+              </button>
             </div>
           </form>
         ) : (
-          <div className="space-y-1.5">
-            <h3 className={`text-base font-bold tracking-tight leading-snug text-white ${
+          <div className="space-y-1.5 group/title cursor-pointer" onClick={() => router.push(`/works/${work.id}`)}>
+            <h3 className={`text-base font-bold tracking-tight leading-snug text-white group-hover/title:text-[#63BDF2] transition-colors ${
               isCompleted || isArchived || isDeleted ? 'line-through text-muted-foreground' : ''
             }`}>
               {work.name}
@@ -359,6 +433,11 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
               </div>
             )}
             <span className="text-white/80 font-medium truncate max-w-[80px]">{work.creator?.name || 'System'}</span>
+            {work.creator && (
+              <span className="text-[7px] text-muted-foreground border border-white/10 px-1 py-0.2 rounded font-bold uppercase tracking-widest bg-white/5">
+                {work.creator.customRole || work.creator.role}
+              </span>
+            )}
           </div>
 
           {/* Assignees */}
@@ -367,7 +446,7 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
             {work.assignees && work.assignees.length > 0 ? (
               <div className="flex -space-x-1.5 overflow-hidden">
                 {work.assignees.map((assignee: any) => (
-                  <div key={assignee.id} className="relative z-10" title={assignee.name}>
+                  <div key={assignee.id} className="relative z-10" title={`${assignee.name} (${assignee.customRole || assignee.role})`}>
                     {assignee.profilePhoto ? (
                       <img src={assignee.profilePhoto} alt={assignee.name} className="w-4 h-4 rounded-full object-cover border border-[#0d0e12]" />
                     ) : (
@@ -437,7 +516,8 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
                     <button 
                       key={sug}
                       onClick={() => handleFastUpdate(sug)}
-                      className="text-[9px] bg-white/5 hover:bg-white/10 border border-white/5 text-muted-foreground hover:text-white px-2 py-0.5 rounded-full transition-colors cursor-pointer"
+                      disabled={isPostingUpdate}
+                      className="text-[9px] bg-white/5 hover:bg-white/10 border border-white/5 text-muted-foreground hover:text-white px-2 py-0.5 rounded-full transition-colors cursor-pointer disabled:opacity-50"
                     >
                       {sug}
                     </button>
@@ -476,107 +556,44 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
       {/* Status Controls Panel */}
       {isAuthorized && (
         <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
-          {/* Time Logging Section for Active Works */}
-          {(isActive || isCompleted) && (
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Time Log</span>
-                {work.timeLogs?.length > 0 && (
-                  <div className="flex items-center gap-1 text-[#63BDF2]">
-                    <span className="text-xs font-black">
-                      {work.timeLogs.reduce((acc: number, l: any) => acc + l.hours, 0)}h
-                    </span>
-                    <span className="text-[10px] text-muted-foreground ml-1">logged</span>
-                  </div>
-                )}
-              </div>
 
-              {isAuthorized && !showTimeLog && (
-                 <button 
-                   onClick={() => setShowTimeLog(true)}
-                   className="bg-[#63BDF2]/10 hover:bg-[#63BDF2]/20 border border-[#63BDF2]/30 text-[#63BDF2] px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all w-fit cursor-pointer"
-                 >
-                   Log Time
-                 </button>
-              )}
-
-              {showTimeLog && (
-                <div className="bg-[#63BDF2]/5 border border-[#63BDF2]/20 rounded-xl p-3 space-y-3 animate-in fade-in slide-in-from-top-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#63BDF2]/80">Log Hours (1h=1pt, 2h=2pt, 4h=5pt)</span>
-                  </div>
-                  <div className="space-y-2">
-                    <input 
-                      type="number"
-                      step="0.5"
-                      min="0.5"
-                      placeholder="Hours spent (e.g., 2)"
-                      value={timeHours}
-                      onChange={(e) => setTimeHours(e.target.value)}
-                      className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-[#63BDF2]/50"
-                    />
-                    <div className="flex justify-end gap-2">
-                      <button 
-                        type="button"
-                        onClick={() => setShowTimeLog(false)}
-                        className="px-2 py-1 text-[10px] text-zinc-400 hover:text-white"
-                      >
-                        Cancel
-                      </button>
-                      <button 
-                        type="button"
-                        disabled={isUpdating || !timeHours}
-                        onClick={handleTimeLogSubmit}
-                        className="bg-[#63BDF2] hover:bg-[#3188DA] text-black px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider disabled:opacity-50 transition-colors"
-                      >
-                        Submit Time
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Display existing time logs */}
-              {work.timeLogs?.length > 0 && (
-                <div className="space-y-2 mt-2 max-h-32 overflow-y-auto custom-scrollbar">
-                  {work.timeLogs.map((log: any) => (
-                    <div key={log.id} className="bg-white/5 border border-white/10 rounded-xl p-2 text-xs flex justify-between items-center">
-                      <div className="flex items-center gap-1.5">
-                        {log.user?.profilePhoto ? (
-                          <img src={log.user.profilePhoto} alt={log.user.name} className="w-4 h-4 rounded-full" />
-                        ) : (
-                          <User size={12} className="text-muted-foreground" />
-                        )}
-                        <span className="font-semibold text-white/90">{log.user?.name}</span>
-                      </div>
-                      <div className="flex gap-2 text-[10px] font-bold">
-                        <span className="text-zinc-400">{log.hours}h</span>
-                        <span className="text-[#63BDF2]">+{log.points} pts</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Quick status selector */}
           <div className="flex flex-wrap items-center gap-1.5 justify-start">
             {/* Transition: Active */}
             {!isActive && !isCompleted && !isArchived && (
               <button 
-                onClick={() => handleStatusChange('ACTIVE')}
+                onClick={async () => {
+                  setActiveAction('ACTIVE')
+                  await handleStatusChange('ACTIVE')
+                }}
                 disabled={isUpdating}
                 className="bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/25 text-blue-400 px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
               >
-                Start Active
+                {activeAction === 'ACTIVE' ? <Loader2 size={10} className="animate-spin" /> : null}
+                Make Active
+              </button>
+            )}
+
+            {/* Transition: Start Work (when Active but not started) */}
+            {isActive && !work.startedAt && (
+              <button 
+                onClick={async () => {
+                  setActiveAction('START')
+                  await handleStatusChange('ACTIVE')
+                }}
+                disabled={isUpdating}
+                className="bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/25 text-blue-400 px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 animate-pulse"
+              >
+                {activeAction === 'START' ? <Loader2 size={10} className="animate-spin" /> : null}
+                Start Work
               </button>
             )}
 
             {/* Transition: Completed */}
             {!isCompleted && !isArchived && (
               <button 
-                onClick={() => handleStatusChange('COMPLETED')}
+                onClick={() => setShowCompleteModal(true)}
                 disabled={isUpdating}
                 className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 text-emerald-400 px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
               >
@@ -598,10 +615,14 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
             {/* Transition: Archive */}
             {!isArchived && (
               <button 
-                onClick={() => handleStatusChange('ARCHIVED')}
+                onClick={async () => {
+                  setActiveAction('ARCHIVED')
+                  await handleStatusChange('ARCHIVED')
+                }}
                 disabled={isUpdating}
                 className="bg-zinc-500/10 hover:bg-zinc-500/20 border border-zinc-500/25 text-zinc-400 px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
               >
+                {activeAction === 'ARCHIVED' ? <Loader2 size={10} className="animate-spin" /> : null}
                 Archive
               </button>
             )}
@@ -609,10 +630,14 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
             {/* Transition: Send back to Idea */}
             {(isCompleted || isArchived || isBlocked || isDeleted) && (
               <button 
-                onClick={() => handleStatusChange('IDEA')}
+                onClick={async () => {
+                  setActiveAction('IDEA')
+                  await handleStatusChange('IDEA')
+                }}
                 disabled={isUpdating}
                 className="bg-[#63BDF2]/10 hover:bg-[#63BDF2]/20 border border-[#63BDF2]/25 text-[#63BDF2] px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
               >
+                {activeAction === 'IDEA' ? <Loader2 size={10} className="animate-spin" /> : null}
                 Move to Idea
               </button>
             )}
@@ -647,7 +672,7 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
                 <input 
                   type="text"
                   placeholder="e.g. 2 days, 1 week..."
-                  id="stop-duration-input"
+                  ref={stopDurationInputRef}
                   className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-red-500/50"
                 />
               </div>
@@ -672,15 +697,16 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
                 <button 
                   type="button"
                   onClick={() => {
-                    const durationEl = document.getElementById('stop-duration-input') as HTMLInputElement
-                    const durationStr = durationEl?.value?.trim()
+                    const durationStr = stopDurationInputRef.current?.value?.trim()
                     const finalReason = durationStr ? `[Stopped for: ${durationStr}] ${blockReason}` : blockReason
                     if (!finalReason.trim()) return
+                    setActiveAction('STOP')
                     handleStatusChange('BLOCKED', finalReason)
                   }}
-                  disabled={!blockReason.trim()}
-                  className="bg-red-500 hover:bg-red-600 text-black px-2.5 py-1 rounded-xl text-[10px] font-black disabled:opacity-50 cursor-pointer"
+                  disabled={isUpdating || !blockReason.trim()}
+                  className="bg-red-500 hover:bg-red-600 text-black px-2.5 py-1 rounded-xl text-[10px] font-black disabled:opacity-50 cursor-pointer flex items-center gap-1"
                 >
+                  {activeAction === 'STOP' ? <Loader2 size={10} className="animate-spin" /> : null}
                   Stop Task
                 </button>
               </div>
@@ -710,19 +736,123 @@ export default function WorkCard({ work, currentUser }: { work: any, currentUser
                 </button>
                 <button 
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     if (!deleteReason.trim()) return
+                    const confirmed = await showConfirm({
+                      title: 'Delete Work Item',
+                      message: `Are you sure you want to delete "${work.name}"? This action is irreversible.`,
+                      confirmText: 'Yes, Delete',
+                      cancelText: 'Cancel',
+                      danger: true
+                    })
+                    if (!confirmed) return
                     const finalReason = `[Deleted by ${currentUser?.name || 'Creator'}] ${deleteReason}`
-                    handleStatusChange('DELETED', finalReason)
+                    setActiveAction('DELETE')
+                    await handleStatusChange('DELETED', finalReason)
                     setShowDeleteInput(false)
                   }}
-                  disabled={!deleteReason.trim()}
-                  className="bg-red-500 hover:bg-red-600 text-black px-2.5 py-1 rounded-xl text-[10px] font-black disabled:opacity-50 cursor-pointer"
+                  disabled={isUpdating || !deleteReason.trim()}
+                  className="bg-red-500 hover:bg-red-600 text-black px-2.5 py-1 rounded-xl text-[10px] font-black disabled:opacity-50 cursor-pointer flex items-center gap-1"
                 >
+                  {activeAction === 'DELETE' ? <Loader2 size={10} className="animate-spin" /> : null}
                   Confirm Delete
                 </button>
               </div>
             </div>
+          )}
+
+          {/* Complete Work Form Dialog */}
+          {showCompleteModal && (
+            <form onSubmit={submitCompleteWork} className="mt-3 p-4 bg-emerald-950/20 border border-emerald-500/30 rounded-2xl space-y-3 animate-in fade-in slide-in-from-top-2">
+              <h4 className="text-xs font-bold text-white uppercase flex items-center gap-1.5">
+                <CheckCircle2 size={12} className="text-emerald-400" /> Confirm Completion
+              </h4>
+              <p className="text-[10px] text-emerald-300/80 leading-relaxed">
+                Great job! Please specify the exact duration this task took to complete.
+              </p>
+              
+              {work.startedAt && (
+                <div className="bg-[#0c0d12]/50 p-3 rounded-xl border border-white/5 space-y-1">
+                  <div className="flex justify-between text-[10px] text-zinc-400">
+                    <span>Started:</span>
+                    <span className="text-white font-medium">{new Date(work.startedAt).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}</span>
+                  </div>
+                  {work.totalBlockedHours > 0 && (
+                    <div className="flex justify-between text-[10px] text-orange-400/80">
+                      <span>Paused Time:</span>
+                      <span className="font-medium">{work.totalBlockedHours.toFixed(1)} Hours</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <div className="flex justify-between items-center">
+                  <label className="text-[9px] uppercase font-bold text-emerald-400">Actual Effort (Days & Hours)</label>
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                    Est: {calculatePoints(actualDays, actualHours)} pts
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="number"
+                    min="1"
+                    required
+                    value={actualDays}
+                    onChange={(e) => {
+                      const daysVal = e.target.value ? Number(e.target.value) : ''
+                      if (daysVal !== '' && Number(daysVal) < 1) {
+                        setActualDays(1)
+                      } else {
+                        setActualDays(daysVal)
+                      }
+                      const finalDays = daysVal !== '' ? Number(daysVal) : 0
+                      if (finalDays > 0) {
+                        if (actualHours === '' || actualHours > 24) {
+                          setActualHours(0)
+                        }
+                      }
+                    }}
+                    placeholder="Days"
+                    className="w-full bg-[#0c0d12]/60 border border-emerald-500/30 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-emerald-500/70"
+                  />
+                  <CustomSelect 
+                    value={(!actualDays || Number(actualDays) === 0) ? actualHours : (actualHours === '' ? 0 : actualHours)}
+                    onChange={setActualHours}
+                    options={(!actualDays || Number(actualDays) === 0)
+                      ? Array.from({ length: 24 }, (_, i) => i + 1).map((h) => ({
+                          value: h,
+                          label: `${h} ${h === 1 ? 'Hour' : 'Hours'}`
+                        }))
+                      : Array.from({ length: 25 }, (_, i) => i).map((h) => ({
+                          value: h,
+                          label: `${h} ${h === 1 ? 'Hour' : 'Hours'}`
+                        }))
+                    }
+                    placeholder="Select Hours"
+                    borderColorClass="border-emerald-500/30 focus:border-emerald-500/70"
+                    className="!py-1.5 !rounded-lg"
+                  />
+                </div>
+                <p className="text-[8px] text-emerald-500/70 font-bold mt-1.5">*Your final points will be calculated based on: 1 Day (24 Hours) = 5 Points, Extra Hours (1h = 1pt, 2-3h = 2pts, 4h+ = 5pts).</p>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button 
+                  type="button"
+                  onClick={() => setShowCompleteModal(false)}
+                  className="px-2 py-1 text-[10px] text-emerald-400/70 hover:text-emerald-300"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={isUpdating || (actualDays === '' && actualHours === '')}
+                  className="bg-emerald-500 hover:bg-emerald-400 text-black px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider disabled:opacity-50 transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  {isUpdating ? <Loader2 size={10} className="animate-spin" /> : null} Confirm Finish
+                </button>
+              </div>
+            </form>
           )}
         </div>
       )}

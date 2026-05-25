@@ -38,6 +38,8 @@ export const metadata: Metadata = {
   },
 };
 
+import NextTopLoader from 'nextjs-toploader';
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -52,6 +54,7 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-screen bg-background text-foreground h-[100dvh] overflow-hidden">
+        <NextTopLoader color="#63BDF2" showSpinner={false} />
         <PwaRegistrar />
         <AppLayout session={session}>{children}</AppLayout>
       </body>

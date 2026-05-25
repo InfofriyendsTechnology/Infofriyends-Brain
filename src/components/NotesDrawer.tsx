@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   X, 
@@ -12,7 +12,8 @@ import {
   BellRing,
   Save,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Loader2
 } from 'lucide-react'
 import { 
   getNotesAction, 
@@ -21,6 +22,7 @@ import {
   deleteNoteAction 
 } from '@/app/actions/notes'
 import { createNotificationAction } from '@/app/actions/notifications'
+import { useStore } from '@/store/useStore'
 
 interface NoteItem {
   id: string
@@ -99,7 +101,7 @@ function ReminderPicker({ value, onChange }: { value: string; onChange: (val: st
     // Format as YYYY-MM-DDTHH:mm for datetime-local compatibility
     const pad = (n: number) => n.toString().padStart(2, '0')
     onChange(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`)
-  }, [selectedDay, hour, minute, period, viewYear, viewMonth])
+  }, [selectedDay, hour, minute, period, viewYear, viewMonth, onChange])
 
   // Calendar grid data
   const calendarDays = useMemo(() => {
@@ -329,6 +331,10 @@ export default function NotesDrawer({ isOpen, onClose }: NotesDrawerProps) {
   // Alert banner states
   const [activeAlarm, setActiveAlarm] = useState<string | null>(null)
 
+  const [isSaving, setIsSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const { addToast, showConfirm } = useStore()
+
   const fetchNotes = async () => {
     try {
       const res = await getNotesAction()
@@ -355,11 +361,16 @@ export default function NotesDrawer({ isOpen, onClose }: NotesDrawerProps) {
     fetchNotes()
   }, [isOpen])
 
+  const notesRef = useRef(notes)
+  useEffect(() => {
+    notesRef.current = notes
+  }, [notes])
+
   // Reminder Engine: checks notes every 15 seconds
   useEffect(() => {
     const checkReminders = () => {
       const now = new Date()
-      notes.forEach(async (note) => {
+      notesRef.current.forEach(async (note) => {
         if (note.reminderAt && now >= note.reminderAt) {
           // Alarm matches! Show visual banner & chime
           setActiveAlarm(note.title || 'Personal Reminder')
@@ -385,7 +396,7 @@ export default function NotesDrawer({ isOpen, onClose }: NotesDrawerProps) {
 
     const interval = setInterval(checkReminders, 15000)
     return () => clearInterval(interval)
-  }, [notes])
+  }, [])
 
   const handleOpenCreate = () => {
     setTitle('')
@@ -406,6 +417,7 @@ export default function NotesDrawer({ isOpen, onClose }: NotesDrawerProps) {
 
   const handleSaveCreate = async () => {
     if (!title.trim() && !content.trim()) return
+    setIsSaving(true)
     try {
       const res = await createNoteAction({
         title: title || 'Untitled Note',
@@ -414,16 +426,23 @@ export default function NotesDrawer({ isOpen, onClose }: NotesDrawerProps) {
         reminderAt: reminderAt ? new Date(reminderAt).toISOString() : null
       })
       if (res.success) {
+        addToast('Note created successfully', 'success')
         fetchNotes()
         setActiveForm('LIST')
+      } else {
+        addToast(res.error || 'Failed to create note', 'error')
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
+      addToast(err.message || 'An error occurred', 'error')
+    } finally {
+      setIsSaving(false)
     }
   }
 
   const handleSaveEdit = async () => {
     if (!currentNote.id) return
+    setIsSaving(true)
     try {
       const res = await updateNoteAction(currentNote.id, {
         title: title || 'Untitled Note',
@@ -432,23 +451,46 @@ export default function NotesDrawer({ isOpen, onClose }: NotesDrawerProps) {
         reminderAt: reminderAt ? new Date(reminderAt).toISOString() : null
       })
       if (res.success) {
+        addToast('Note updated successfully', 'success')
         fetchNotes()
         setActiveForm('LIST')
+      } else {
+        addToast(res.error || 'Failed to update note', 'error')
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
+      addToast(err.message || 'An error occurred', 'error')
+    } finally {
+      setIsSaving(false)
     }
   }
 
   const handleDeleteNote = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
+    const note = notes.find(n => n.id === id)
+    const titleText = note?.title || 'this note'
+    const confirmed = await showConfirm({
+      title: 'Delete Personal Note',
+      message: `Are you sure you want to delete "${titleText}"? This note cannot be recovered.`,
+      confirmText: 'Delete Note',
+      danger: true
+    })
+    if (!confirmed) return
+
+    setDeletingId(id)
     try {
       const res = await deleteNoteAction(id)
       if (res.success) {
+        addToast('Note deleted successfully', 'success')
         setNotes(prev => prev.filter(n => n.id !== id))
+      } else {
+        addToast(res.error || 'Failed to delete note', 'error')
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
+      addToast(err.message || 'An error occurred', 'error')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -576,10 +618,11 @@ export default function NotesDrawer({ isOpen, onClose }: NotesDrawerProps) {
                                 
                                 <button
                                   onClick={(e) => handleDeleteNote(note.id, e)}
-                                  className="opacity-0 group-hover:opacity-100 p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all cursor-pointer shrink-0"
+                                  disabled={deletingId === note.id}
+                                  className={`p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all cursor-pointer shrink-0 disabled:opacity-50 ${deletingId === note.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                                   title="Delete Note"
                                 >
-                                  <Trash2 size={12} />
+                                  {deletingId === note.id ? <Loader2 size={12} className="animate-spin text-red-400" /> : <Trash2 size={12} />}
                                 </button>
                               </div>
                               <p className="text-[11px] text-zinc-400 mt-2 pl-2 leading-relaxed break-words line-clamp-3">
@@ -650,15 +693,17 @@ export default function NotesDrawer({ isOpen, onClose }: NotesDrawerProps) {
                     <div className="flex gap-3 pt-4 border-t border-white/5">
                       <button
                         onClick={() => setActiveForm('LIST')}
-                        className="flex-1 bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white py-3 rounded-2xl text-xs font-bold border border-white/5 transition-all cursor-pointer text-center"
+                        disabled={isSaving}
+                        className="flex-1 bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white py-3 rounded-2xl text-xs font-bold border border-white/5 transition-all cursor-pointer text-center disabled:opacity-50"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={activeForm === 'CREATE' ? handleSaveCreate : handleSaveEdit}
-                        className="flex-1 bg-[#63BDF2] text-black py-3 rounded-2xl text-xs font-black transition-all cursor-pointer hover:shadow-[0_4px_15px_rgba(99,189,242,0.35)] active:scale-98 flex items-center justify-center gap-1.5 uppercase"
+                        disabled={isSaving}
+                        className="flex-1 bg-[#63BDF2] text-black py-3 rounded-2xl text-xs font-black transition-all cursor-pointer hover:shadow-[0_4px_15px_rgba(99,189,242,0.35)] active:scale-98 flex items-center justify-center gap-1.5 uppercase disabled:opacity-50"
                       >
-                        <Save size={12} className="stroke-[3px]" /> Save Note
+                        {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} className="stroke-[3px]" />} Save Note
                       </button>
                     </div>
                   </div>

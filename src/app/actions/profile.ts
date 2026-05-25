@@ -43,7 +43,9 @@ export async function updateProfileAction(formData: FormData) {
       id: updatedUser.id,
       role: updatedUser.role,
       name: updatedUser.name,
-      username: updatedUser.username
+      username: updatedUser.username,
+      customRole: updatedUser.customRole,
+      profilePhoto: updatedUser.profilePhoto
     })
 
     revalidatePath('/profile')

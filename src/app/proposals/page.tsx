@@ -1,4 +1,4 @@
-import { getIdeasWithSupports } from '@/app/actions'
+import { getIdeasWithSupports, getWorks } from '@/app/actions'
 import { getMembers } from '@/app/actions/admin'
 import { getSession } from '@/lib/auth'
 import IdeaAgreementHub from '@/components/IdeaAgreementHub'
@@ -10,10 +10,13 @@ export const dynamic = 'force-dynamic'
 // --- PROPOSALS STREAMING SECTION ---
 async function ProposalsSection({ session }: { session: any }) {
   let ideas: any[] = []
+  let members: any[] = []
+  let works: any[] = []
   let membersCount = 0
   try {
     ideas = await getIdeasWithSupports()
-    const members = await getMembers()
+    members = await getMembers()
+    works = await getWorks()
     membersCount = members.filter((m: any) => m.role !== 'ADMIN').length
   } catch (error) {}
 
@@ -22,6 +25,8 @@ async function ProposalsSection({ session }: { session: any }) {
       ideas={ideas} 
       currentUser={session?.user} 
       membersCount={membersCount} 
+      members={members}
+      works={works}
     />
   )
 }
@@ -30,33 +35,38 @@ function ProposalsSkeleton() {
   return (
     <div className="space-y-6 select-none animate-pulse">
       <div className="flex justify-between items-center pb-4 border-b border-white/5">
-        <div className="h-6 w-56 bg-white/5 rounded-lg" />
-        <div className="h-9 w-32 bg-white/5 rounded-xl" />
+        <div className="h-6 w-48 md:w-56 bg-white/[0.06] rounded-lg" />
+        <div className="h-9 w-28 md:w-32 bg-white/[0.06] rounded-xl" />
       </div>
       <div className="overflow-x-auto scrollbar-none -mx-4 px-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0">
-        <div className="flex bg-zinc-950/60 p-1 rounded-2xl border border-white/5 gap-1.5 w-max min-w-full md:w-full md:grid md:grid-cols-5">
+        <div className="flex bg-white/[0.02] p-1 rounded-2xl border border-white/5 gap-1.5 w-max min-w-full md:w-full md:grid md:grid-cols-5">
           {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className="flex-1 flex-shrink-0 h-9 sm:h-11 bg-white/5 rounded-xl" />
+            <div key={i} className="flex-1 flex-shrink-0 h-9 sm:h-11 bg-white/[0.06] rounded-xl" />
           ))}
         </div>
       </div>
       <div className="space-y-4">
         {[1, 2, 3].map(i => (
-          <div key={i} className="h-36 bg-white/5 rounded-2xl" />
+          <div key={i} className="h-36 bg-white/[0.06] rounded-2xl" />
         ))}
       </div>
     </div>
   )
 }
 
+import { redirect } from 'next/navigation'
+
 // --- MAIN PAGE ---
 export default async function ProposalsPage() {
   const session = await getSession()
+  if (!session) {
+    redirect('/login')
+  }
 
   return (
-    <div className="space-y-8 pb-20 w-full px-4 sm:px-6 lg:px-12 pt-6">
+    <div className="space-y-6 md:space-y-8 pb-20 w-full px-4 sm:px-6 lg:px-12 pt-4 md:pt-6">
       {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-3xl border border-border/40 bg-gradient-to-br from-yellow-500/5 via-background to-amber-500/5 p-6 md:p-8 backdrop-blur-xl">
+      <div className="relative overflow-hidden rounded-2xl md:rounded-3xl border border-border/40 bg-gradient-to-br from-yellow-500/5 via-background to-amber-500/5 p-4 sm:p-5 md:p-8 backdrop-blur-xl">
         {/* Ambient Glows */}
         <div className="absolute top-0 right-0 w-80 h-80 bg-yellow-400/8 rounded-full blur-[100px] pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-60 h-60 bg-amber-500/5 rounded-full blur-[80px] pointer-events-none" />
@@ -97,7 +107,7 @@ export default async function ProposalsPage() {
       </div>
 
       {/* Full Proposals Management Hub */}
-      <div className="bg-secondary/10 border border-border/30 rounded-3xl p-6 backdrop-blur-xl">
+      <div className="bg-secondary/10 border border-border/30 rounded-2xl md:rounded-3xl p-4 sm:p-5 md:p-6 backdrop-blur-xl">
         <Suspense fallback={<ProposalsSkeleton />}>
           <ProposalsSection session={session} />
         </Suspense>

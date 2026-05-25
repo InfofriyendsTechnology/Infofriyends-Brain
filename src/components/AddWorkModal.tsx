@@ -13,7 +13,7 @@ export default function AddWorkModal({ user }: { user: any }) {
   const [error, setError] = useState<string | null>(null)
   const [members, setMembers] = useState<any[]>([])
   const [works, setWorks] = useState<any[]>([])
-  const [selectedPersonMentions, setSelectedPersonMentions] = useState<string[]>([])
+  const [selectedCreatorId, setSelectedCreatorId] = useState<string>('')
 
   useEffect(() => {
     if (!isAddWorkModalOpen) return
@@ -22,12 +22,18 @@ export default function AddWorkModal({ user }: { user: any }) {
         const [memberList, workList] = await Promise.all([getMembers(), getWorks()])
         setMembers(memberList)
         setWorks(workList.filter((w: any) => w.status !== 'DELETED' && w.status !== 'ARCHIVED'))
+        
+        const nonAdminMembers = memberList.filter((m: any) => m.role !== 'ADMIN')
+        if (nonAdminMembers.length > 0) {
+          const defaultCreator = user?.role === 'ADMIN' ? nonAdminMembers[0].id : (nonAdminMembers.find((m: any) => m.id === user?.id)?.id || nonAdminMembers[0].id)
+          setSelectedCreatorId(defaultCreator)
+        }
       } catch (err) {
         console.error('Failed to load data:', err)
       }
     }
     loadData()
-  }, [isAddWorkModalOpen])
+  }, [isAddWorkModalOpen, user])
 
   if (!isAddWorkModalOpen) return null
 
@@ -37,16 +43,12 @@ export default function AddWorkModal({ user }: { user: any }) {
     setError(null)
     try {
       const formData = new FormData(e.currentTarget)
-      if (selectedPersonMentions.length > 0) {
-        formData.append('personMentions', JSON.stringify(selectedPersonMentions))
-      }
 
       const res = await createWork(formData)
       if (res && !res.success) {
         setError(res.error || 'Failed to create work.')
       } else {
         setAddWorkModalOpen(false)
-        setSelectedPersonMentions([])
       }
     } catch (err: any) {
       setError(err.message || 'Failed to create work.')
@@ -152,6 +154,18 @@ export default function AddWorkModal({ user }: { user: any }) {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
+                <label htmlFor="type" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Proposal Type</label>
+                <select
+                  id="type"
+                  name="type"
+                  defaultValue="IDEA"
+                  className="w-full bg-[#0d0e12] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#63BDF2]/50 transition-all"
+                >
+                  <option value="IDEA">IDEA (Direct 10 Points)</option>
+                  <option value="ACTION">ACTION (Time & Mention Based)</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
                 <label htmlFor="status" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Initial Status</label>
                 <select
                   id="status"
@@ -166,7 +180,9 @@ export default function AddWorkModal({ user }: { user: any }) {
                   <option value="ARCHIVED">ARCHIVED</option>
                 </select>
               </div>
+            </div>
 
+            <div className="grid grid-cols-1 gap-4">
               <div className="space-y-1.5">
                 <label htmlFor="dueDate" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Optional Due Date</label>
                 <div className="relative">
@@ -181,31 +197,26 @@ export default function AddWorkModal({ user }: { user: any }) {
               </div>
             </div>
 
-            {/* Row: Mentions System */}
+            {/* Row: Creator & Mentions System */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-white/5 pt-4 mt-2">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[#63BDF2] uppercase tracking-wider">Idea Creators (10 pts)</label>
+                <label className="text-xs font-bold text-[#63BDF2] uppercase tracking-wider">Idea Creator / Author (10 pts)</label>
+                <input type="hidden" name="creatorId" value={selectedCreatorId} />
                 <div className="flex flex-wrap gap-1.5 p-2 bg-[#0c0d12]/50 border border-[#63BDF2]/20 rounded-xl min-h-[42px]">
-                   {members.filter(m => m.role !== 'ADMIN').map(m => (
-                     <button
-                       type="button"
-                       key={m.id}
-                       onClick={() => {
-                         if (selectedPersonMentions.includes(m.id)) {
-                           setSelectedPersonMentions(prev => prev.filter(id => id !== m.id))
-                         } else {
-                           setSelectedPersonMentions(prev => [...prev, m.id])
-                         }
-                       }}
-                       className={`px-2 py-1 text-[10px] rounded-lg border transition-colors ${
-                         selectedPersonMentions.includes(m.id) 
-                         ? 'bg-purple-500/20 border-purple-500/50 text-purple-400' 
-                         : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
-                       }`}
-                     >
-                       {m.name}
-                     </button>
-                   ))}
+                  {members.filter(m => m.role !== 'ADMIN').map((m) => (
+                    <button
+                      type="button"
+                      key={m.id}
+                      onClick={() => setSelectedCreatorId(m.id)}
+                      className={`px-2 py-1 text-[10px] rounded-lg border transition-colors cursor-pointer ${
+                        selectedCreatorId === m.id
+                          ? 'bg-purple-500/20 border-purple-500/50 text-purple-400 font-bold'
+                          : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      {m.name}
+                    </button>
+                  ))}
                 </div>
               </div>
 

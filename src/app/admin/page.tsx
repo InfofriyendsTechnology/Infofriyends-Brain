@@ -2,6 +2,8 @@ import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import AdminDashboardClient from './AdminDashboardClient'
 import { Shield } from 'lucide-react'
+import { getMembers } from '@/app/actions/admin'
+import { getWorks } from '@/app/actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,6 +13,9 @@ export default async function AdminPage() {
   if (!session || session.user.role !== 'ADMIN') {
     redirect('/')
   }
+
+  const members = await getMembers()
+  const works = await getWorks()
 
   return (
     <div className="space-y-8 pb-20 w-full px-4 sm:px-6 lg:px-12 pt-6">
@@ -33,7 +38,7 @@ export default async function AdminPage() {
       </div>
 
       {/* Main Content */}
-      <AdminDashboardClient />
+      <AdminDashboardClient initialMembers={members} initialWorks={works} />
     </div>
   )
 }

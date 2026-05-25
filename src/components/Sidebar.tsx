@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LayoutDashboard, Briefcase, Shield, LogOut, Plus, User, MessageSquare, MoreHorizontal, EyeOff, ChevronUp, Lightbulb, Users } from 'lucide-react'
+import { LayoutDashboard, Briefcase, Shield, LogOut, Plus, User, MessageSquare, MoreHorizontal, EyeOff, ChevronUp, Lightbulb, Users, Loader2 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { logoutAction } from '@/app/actions/auth'
 import { useState, useEffect } from 'react'
@@ -14,6 +14,7 @@ export default function Sidebar({ session }: { session: any }) {
   const { setAddWorkModalOpen, isNavbarHidden, setNavbarHidden } = useStore()
   const [greeting, setGreeting] = useState('Hey')
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
 
   useEffect(() => {
@@ -93,10 +94,10 @@ export default function Sidebar({ session }: { session: any }) {
                 </div>
                 <div className="min-w-0 flex-1">
                   <h4 className="text-sm font-bold text-white capitalize truncate leading-none mb-1.5">
-                    {session.user.name}
+                    {greeting}, {session.user.name.split(' ')[0]}
                   </h4>
                   <span className="text-[8px] text-muted-foreground border border-border/50 px-1.5 py-0.5 rounded font-mono uppercase font-bold tracking-wider">
-                    {session.user.role}
+                    {session.user.customRole || session.user.role}
                   </span>
                 </div>
               </div>
@@ -162,8 +163,17 @@ export default function Sidebar({ session }: { session: any }) {
                 </Link>
               )}
 
-
-
+              <Link
+                href="/members"
+                onClick={() => setShowMoreMenu(false)}
+                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  pathname === '/members' ? 'text-[#63BDF2] bg-[#63BDF2]/10' : 'text-muted-foreground hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <Users size={16} />
+                <span>Team Members</span>
+              </Link>
+              
               <button
                 onClick={() => {
                   setShowMoreMenu(false)
@@ -324,21 +334,27 @@ export default function Sidebar({ session }: { session: any }) {
                 <div className="flex gap-3 w-full pt-4">
                   <button 
                     onClick={() => setShowLogoutConfirm(false)}
-                    className="flex-1 bg-white/5 hover:bg-white/10 border border-white/5 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+                    disabled={isLoggingOut}
+                    className="flex-1 bg-white/5 hover:bg-white/10 border border-white/5 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button 
                     onClick={async () => {
-                      setShowLogoutConfirm(false)
+                      setIsLoggingOut(true)
                       const res = await logoutAction()
                       if (res?.success) {
                         router.push('/login')
                         router.refresh()
+                      } else {
+                        setIsLoggingOut(false)
+                        setShowLogoutConfirm(false)
                       }
                     }}
-                    className="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-500/90 hover:to-red-600/90 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-lg shadow-red-500/10"
+                    disabled={isLoggingOut}
+                    className="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-500/90 hover:to-red-600/90 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-lg shadow-red-500/10 flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
+                    {isLoggingOut && <Loader2 size={12} className="animate-spin" />}
                     Sign Out
                   </button>
                 </div>

@@ -4,8 +4,11 @@ import { useState } from 'react'
 import { impersonateMemberAction } from '@/app/actions/admin'
 import { Loader2, Shield } from 'lucide-react'
 
+import { useStore } from '@/store/useStore'
+
 export default function ImpersonateButton({ memberId, memberName }: { memberId: string, memberName: string }) {
   const [isImpersonating, setIsImpersonating] = useState(false)
+  const { addToast } = useStore()
 
   return (
     <button
@@ -13,10 +16,11 @@ export default function ImpersonateButton({ memberId, memberName }: { memberId: 
         setIsImpersonating(true)
         const res = await impersonateMemberAction(memberId)
         if (res.success) {
+          addToast(`Logging in as ${memberName}`, 'success')
           window.location.href = '/'
         } else {
           setIsImpersonating(false)
-          alert(res.error)
+          addToast(res.error || 'Impersonation failed', 'error')
         }
       }}
       disabled={isImpersonating}

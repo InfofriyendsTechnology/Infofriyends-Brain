@@ -94,6 +94,7 @@ export async function sendChatMessage(channelId: string, message: string) {
             id: true,
             name: true,
             role: true,
+            customRole: true,
             profilePhoto: true
           }
         }
@@ -124,6 +125,7 @@ export async function getChannelMessages(channelId: string) {
             id: true,
             name: true,
             role: true,
+            customRole: true,
             profilePhoto: true,
           }
         }
@@ -186,6 +188,7 @@ export async function syncChatroom(channelId: string) {
               id: true,
               name: true,
               role: true,
+              customRole: true,
               profilePhoto: true,
             }
           }
@@ -214,6 +217,7 @@ export async function syncChatroom(channelId: string) {
           id: true,
           name: true,
           role: true,
+          customRole: true,
           profilePhoto: true,
           lastActive: true
         },
@@ -231,6 +235,7 @@ export async function syncChatroom(channelId: string) {
           id: m.id,
           name: m.name,
           role: m.role,
+          customRole: m.customRole,
           profilePhoto: m.profilePhoto,
           isOnline,
           lastActive: m.lastActive

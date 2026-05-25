@@ -49,16 +49,16 @@ async function MetricsSection() {
 
 function MetricsSkeleton() {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 select-none animate-pulse">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 select-none animate-pulse">
       {[1, 2, 3, 4].map((i) => (
-        <div key={i} className="relative overflow-hidden p-5 rounded-2xl border border-white/5 bg-[#0d0e12]">
+        <div key={i} className="relative overflow-hidden p-4 sm:p-5 rounded-xl md:rounded-2xl border border-white/5 bg-zinc-950/40 backdrop-blur-md">
           <div className="flex items-center justify-between mb-3">
-            <div className="h-4 w-20 bg-white/5 rounded" />
-            <div className="w-8 h-8 rounded-xl bg-white/5" />
+            <div className="h-4 w-16 md:w-20 bg-white/[0.06] rounded" />
+            <div className="w-8 h-8 rounded-xl bg-white/[0.06]" />
           </div>
           <div className="space-y-2">
-            <div className="h-7 w-12 bg-white/5 rounded-lg" />
-            <div className="h-3.5 w-24 bg-white/5 rounded" />
+            <div className="h-6 md:h-7 w-12 bg-white/[0.06] rounded-lg" />
+            <div className="h-3 md:h-3.5 w-20 md:w-24 bg-white/[0.06] rounded" />
           </div>
         </div>
       ))}
@@ -95,27 +95,27 @@ async function ActiveProjectsSection({ currentUser }: { currentUser: any }) {
 
 function ActiveProjectsSkeleton() {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 select-none animate-pulse">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 select-none animate-pulse">
       {[1, 2, 3].map((i) => (
-        <div key={i} className="relative group p-6 rounded-3xl border border-white/10 flex flex-col h-full bg-[#09090b]">
+        <div key={i} className="relative group p-4 md:p-6 rounded-xl md:rounded-3xl border border-white/5 flex flex-col h-full bg-white/[0.02]">
           <div className="space-y-3 flex-1">
             <div className="flex justify-between items-start gap-4">
               <div className="space-y-1.5 min-w-0 flex-1">
-                <div className="h-4 w-2/3 bg-white/5 rounded-lg" />
-                <div className="h-5.5 w-16 bg-white/5 rounded-full" />
+                <div className="h-4 w-2/3 bg-white/[0.06] rounded-lg" />
+                <div className="h-5 w-16 bg-white/[0.06] rounded-full" />
               </div>
             </div>
             <div className="space-y-1.5 mt-2">
-              <div className="h-3.5 w-full bg-white/5 rounded" />
-              <div className="h-3.5 w-11/12 bg-white/5 rounded" />
+              <div className="h-3.5 w-full bg-white/[0.06] rounded" />
+              <div className="h-3.5 w-11/12 bg-white/[0.06] rounded" />
             </div>
           </div>
-          <div className="flex items-center justify-between pt-4 mt-6 border-t border-white/5">
+          <div className="flex items-center justify-between pt-4 mt-4 md:mt-6 border-t border-white/5">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-white/5" />
-              <div className="h-3 w-16 bg-white/5 rounded" />
+              <div className="w-6 h-6 rounded-full bg-white/[0.06]" />
+              <div className="h-3 w-16 bg-white/[0.06] rounded" />
             </div>
-            <div className="w-12 h-4 bg-white/5 rounded" />
+            <div className="w-12 h-4 bg-white/[0.06] rounded" />
           </div>
         </div>
       ))}
@@ -135,19 +135,19 @@ async function LeaderboardSection() {
 
 function LeaderboardSkeleton() {
   return (
-    <div className="bg-[#0d0e12] border border-white/5 rounded-3xl p-6 space-y-6 select-none animate-pulse">
-      <div className="flex items-center justify-between pb-4 border-b border-white/5">
-        <div className="h-6 w-32 bg-white/5 rounded-lg" />
-        <div className="h-5 w-24 bg-white/5 rounded-full" />
+    <div className="bg-zinc-950/40 backdrop-blur-md border border-white/5 rounded-2xl md:rounded-3xl p-4 sm:p-5 md:p-6 space-y-4 md:space-y-6 select-none animate-pulse">
+      <div className="flex items-center justify-between pb-3 md:pb-4 border-b border-white/5">
+        <div className="h-6 w-32 bg-white/[0.06] rounded-lg" />
+        <div className="h-5 w-24 bg-white/[0.06] rounded-full" />
       </div>
-      <div className="space-y-4">
+      <div className="space-y-3 md:space-y-4">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-white/5 bg-background/40">
+          <div key={i} className="flex items-center justify-between gap-4 p-3 rounded-xl md:rounded-2xl border border-white/5 bg-white/[0.02]">
             <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-9 h-9 rounded-full bg-white/5" />
+              <div className="w-9 h-9 rounded-full bg-white/[0.06]" />
               <div className="min-w-0 flex-1 space-y-1.5">
-                <div className="h-3.5 w-24 bg-white/5 rounded" />
-                <div className="h-3 w-16 bg-white/5 rounded" />
+                <div className="h-3.5 w-24 bg-white/[0.06] rounded" />
+                <div className="h-3 w-16 bg-white/[0.06] rounded" />
               </div>
             </div>
           </div>
@@ -252,60 +252,16 @@ function ProposalsPreviewSkeleton() {
     <div className="space-y-4 select-none animate-pulse">
       <div className="grid grid-cols-3 gap-3">
         {[1, 2, 3].map(i => (
-          <div key={i} className="bg-[#0c0d12]/60 border border-white/5 rounded-xl p-3 space-y-2">
-            <div className="h-5 w-6 mx-auto bg-white/5 rounded" />
-            <div className="h-2.5 w-12 mx-auto bg-white/5 rounded" />
+          <div key={i} className="bg-white/[0.02] border border-white/5 rounded-xl p-3 space-y-2">
+            <div className="h-5 w-6 mx-auto bg-white/[0.06] rounded" />
+            <div className="h-2.5 w-12 mx-auto bg-white/[0.06] rounded" />
           </div>
         ))}
       </div>
       <div className="space-y-2.5">
         {[1, 2, 3].map(i => (
-          <div key={i} className="h-16 bg-white/5 rounded-xl" />
+          <div key={i} className="h-16 bg-white/[0.02] border border-white/5 rounded-xl" />
         ))}
-      </div>
-    </div>
-  )
-}
-
-// --- WORKSPACE GUIDE CARD ---
-function WorkspaceGuideCard() {
-  return (
-    <div className="bg-secondary/20 border border-[#63BDF2]/10 rounded-3xl p-6 space-y-5 backdrop-blur-xl relative overflow-hidden group">
-      <div className="absolute -top-10 -right-10 w-24 h-24 bg-[#63BDF2]/10 rounded-full blur-2xl group-hover:bg-[#63BDF2]/15 transition-all duration-300" />
-      
-      <div className="flex items-center gap-2 pb-3 border-b border-border/30">
-        <span className="text-lg">💡</span>
-        <h3 className="font-bold text-sm uppercase tracking-wider text-white">How It Works</h3>
-      </div>
-      
-      <div className="space-y-4">
-        <div className="space-y-1">
-          <h4 className="text-xs font-bold text-yellow-400 flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
-            Proposals & Decisions
-          </h4>
-          <p className="text-[11px] text-zinc-400 leading-relaxed pl-3 font-medium">
-            Team members propose ideas. Everyone votes to agree. Once consensus is reached, proposals convert to active workspace tasks.
-          </p>
-        </div>
-        <div className="space-y-1">
-          <h4 className="text-xs font-bold text-primary flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-            Workspace
-          </h4>
-          <p className="text-[11px] text-zinc-400 leading-relaxed pl-3 font-medium">
-            Daily operations hub. Active tasks, ongoing projects, and completed work. Items arrive here after proposal approval.
-          </p>
-        </div>
-        <div className="space-y-1">
-          <h4 className="text-xs font-bold text-orange-400 flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
-            Founder Board
-          </h4>
-          <p className="text-[11px] text-zinc-400 leading-relaxed pl-3 font-medium">
-            Contribution leaderboard. Members earn points when tasks they handle are completed.
-          </p>
-        </div>
       </div>
     </div>
   )
@@ -322,8 +278,8 @@ export default async function Home() {
   }
 
   return (
-    <div className="space-y-8 pb-20 w-full px-4 sm:px-6 lg:px-12 pt-6">      {/* Header Banner (Instant Render) */}
-      <div className="relative overflow-hidden rounded-3xl border border-border/40 bg-gradient-to-br from-secondary/15 via-background to-secondary/10 p-6 md:p-8 backdrop-blur-xl">
+    <div className="space-y-6 md:space-y-8 pb-20 w-full px-4 sm:px-6 lg:px-12 pt-4 md:pt-6">      {/* Header Banner (Instant Render) */}
+      <div className="relative overflow-hidden rounded-2xl md:rounded-3xl border border-border/40 bg-gradient-to-br from-secondary/15 via-background to-secondary/10 p-4 sm:p-5 md:p-8 backdrop-blur-xl">
         <div className="absolute top-0 right-0 w-80 h-80 bg-[#63BDF2]/10 rounded-full blur-[100px] pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-60 h-60 bg-[#3188DA]/5 rounded-full blur-[80px] pointer-events-none" />
 
@@ -356,8 +312,8 @@ export default async function Home() {
       </Suspense>
 
       {/* Active Workspace — FULL WIDTH */}
-      <div className="bg-secondary/10 border border-border/30 rounded-3xl p-6 backdrop-blur-xl space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border/30">
+      <div className="bg-secondary/10 border border-border/30 rounded-2xl md:rounded-3xl p-4 sm:p-5 md:p-6 backdrop-blur-xl space-y-4 md:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 md:pb-4 border-b border-border/30">
           <div className="flex items-center gap-2">
             <Briefcase className="text-primary" size={20} />
             <h2 className="text-lg font-bold text-white tracking-tight">Active Workspace</h2>
@@ -380,9 +336,9 @@ export default async function Home() {
       </div>
 
       {/* Proposals + Leaderboard — SIDE BY SIDE */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8 items-start">
         {/* Proposals Compact Preview (Read-Only) */}
-        <div className="bg-secondary/20 border border-yellow-400/10 rounded-3xl p-6 backdrop-blur-xl space-y-4">
+        <div className="bg-secondary/20 border border-yellow-400/10 rounded-2xl md:rounded-3xl p-4 sm:p-5 md:p-6 backdrop-blur-xl space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-border/30">
             <div className="flex items-center gap-2">
               <Lightbulb className="text-yellow-400" size={18} />

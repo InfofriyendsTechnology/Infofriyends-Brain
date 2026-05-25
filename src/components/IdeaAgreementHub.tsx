@@ -1,16 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useStore } from '@/store/useStore'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Lightbulb, Check, Plus, Clock, Calendar, 
+  Lightbulb, Check, Plus, Clock, Calendar, Zap,
   ThumbsUp, ThumbsDown, MessageSquare, CornerDownRight, Loader2, Play, ListOrdered, XCircle, Pause, RotateCcw, Trash2,
   ChevronDown, ChevronUp, History, ArrowRightCircle, AlertTriangle, Archive, Edit2, Send, Users
 } from 'lucide-react'
-import { createWork, updateWorkStatus, toggleIdeaSupport, queueIdea, declineIdea, shelveIdea, reviveIdea, deleteIdea, editWork, getWorks, disagreeWithIdea, replyToDisagree, removeDisagree, adminAllAgree } from '@/app/actions'
+import { createWork, updateWorkStatus, toggleIdeaSupport, queueIdea, declineIdea, shelveIdea, reviveIdea, deleteIdea, editWork, getWorks, disagreeWithIdea, replyToDisagree, removeDisagree, adminAllAgree, convertIdeaToWork, permanentlyDeleteWork } from '@/app/actions'
 import { getMembers } from '@/app/actions/admin'
-import { useEffect } from 'react'
+import DateTimePicker from './DateTimePicker'
 import SectionGuide from './SectionGuide'
+import CustomSelect from './CustomSelect'
 
 interface Idea {
   id: string
@@ -27,13 +30,22 @@ interface Idea {
     name: string
     profilePhoto: string | null
     role: string
+    customRole?: string | null
   }
-  assignee?: {
+  assignees?: {
     id: string
     name: string
     profilePhoto: string | null
     role: string
-  } | null
+    customRole?: string | null
+  }[]
+  type?: string
+  expectedDurationHours?: number | null
+  dueDate?: string | null
+  startedAt?: string | null
+  completedAt?: string | null
+  actualDurationHours?: number | null
+  parentWorkId?: string | null
   supports: {
     userId: string
     createdAt: string
@@ -42,6 +54,7 @@ interface Idea {
       name: string
       profilePhoto: string | null
       role: string
+      customRole?: string | null
     }
   }[]
   activityLogs: {
@@ -94,6 +107,8 @@ interface IdeaAgreementHubProps {
   ideas: Idea[]
   currentUser: any
   membersCount: number
+  members: any[]
+  works: any[]
 }
 
 function formatDateTime(dateStr: string) {
@@ -119,7 +134,24 @@ function formatRelativeTime(dateStr: string) {
   return formatDateTime(dateStr)
 }
 
-export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: IdeaAgreementHubProps) {
+export default function IdeaAgreementHub({ ideas, currentUser, membersCount, members, works }: IdeaAgreementHubProps) {
+  const router = useRouter()
+  const { addToast, showConfirm } = useStore()
+
+  const calculatePoints = (mode: 'hours' | 'days', daysVal: number | '', hoursVal: number | '') => {
+    const h = hoursVal !== '' ? Number(hoursVal) : 0
+    if (mode === 'hours') {
+      const days = Math.floor(h / 24)
+      const extraHours = h % 24
+      const extraPoints = extraHours >= 4 ? 5 : extraHours >= 2 ? 2 : extraHours >= 1 ? 1 : 0
+      return (days * 5) + extraPoints
+    } else {
+      const d = daysVal !== '' ? Number(daysVal) : 0
+      const extraPoints = h >= 4 ? 5 : h >= 2 ? 2 : h >= 1 ? 1 : 0
+      return (d * 5) + extraPoints
+    }
+  }
+
   const [activeTab, setActiveTab] = useState<'open' | 'queued' | 'declined' | 'shelved' | 'deleted'>('open')
   const [showAddForm, setShowAddForm] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -129,49 +161,52 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
   
   // Decline modal state
   const [declineModalId, setDeclineModalId] = useState<string | null>(null)
+  const [selectedCreatorId, setSelectedCreatorId] = useState<string>('')
   const [declineReason, setDeclineReason] = useState('')
   const [isDeclining, setIsDeclining] = useState(false)
 
-  // Disagree state
+  // Set default creator when members load
+  useEffect(() => {
+    if (members && members.length > 0 && !selectedCreatorId) {
+      const nonAdminMembers = members.filter((m: any) => m.role !== 'ADMIN')
+      if (nonAdminMembers.length > 0) {
+        const defaultCreator = currentUser?.role === 'ADMIN' ? nonAdminMembers[0].id : (nonAdminMembers.find((m: any) => m.id === currentUser?.id)?.id || nonAdminMembers[0].id)
+        setSelectedCreatorId(defaultCreator)
+      }
+    }
+  }, [members, currentUser, selectedCreatorId])
+
+  // Disagree modal state
   const [disagreeModalId, setDisagreeModalId] = useState<string | null>(null)
   const [disagreeReason, setDisagreeReason] = useState('')
   const [isDisagreeing, setIsDisagreeing] = useState(false)
 
-  // Reply state
+  // Reply modal state
   const [replyModalId, setReplyModalId] = useState<string | null>(null)
   const [replyContent, setReplyContent] = useState('')
   const [isReplying, setIsReplying] = useState(false)
 
-  // Mentions state
-  const [members, setMembers] = useState<any[]>([])
-  const [works, setWorks] = useState<any[]>([])
-  const [selectedPersonMentions, setSelectedPersonMentions] = useState<string[]>([])
-
-  useEffect(() => {
-    if (!showAddForm) return
-    async function loadData() {
-      try {
-        const [memberList, workList] = await Promise.all([getMembers(), getWorks()])
-        setMembers(memberList)
-        setWorks(workList.filter((w: any) => w.status !== 'DELETED' && w.status !== 'ARCHIVED'))
-      } catch (err) {
-        console.error('Failed to load data:', err)
-      }
-    }
-    loadData()
-  }, [showAddForm])
-
-  // All Agree (Super Admin)
+  // All agree confirmation modal state
   const [allAgreeId, setAllAgreeId] = useState<string | null>(null)
-
-  // Delete confirmation
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   // Edit inline state
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editPriority, setEditPriority] = useState('MEDIUM')
   const [editDescription, setEditDescription] = useState('')
+  const [editDurationMode, setEditDurationMode] = useState<'hours' | 'days'>('hours')
+  const [editExpectedDays, setEditExpectedDays] = useState<number | ''>('')
+  const [editExpectedHours, setEditExpectedHours] = useState<number | ''>('')
+  const [editDeadline, setEditDeadline] = useState<Date | null>(null)
+  const [editAssigneeIds, setEditAssigneeIds] = useState<string[]>([])
+
+  // Convert to Work Modal/Inline state
+  const [convertModalId, setConvertModalId] = useState<string | null>(null)
+  const [convertDurationMode, setConvertDurationMode] = useState<'hours' | 'days'>('hours')
+  const [convertExpectedDays, setConvertExpectedDays] = useState<number | ''>('')
+  const [convertExpectedHours, setConvertExpectedHours] = useState<number | ''>('')
+  const [convertDeadline, setConvertDeadline] = useState<Date | null>(null)
+  const [convertAssigneeIds, setConvertAssigneeIds] = useState<string[]>([])
 
   const openIdeas = ideas.filter(f => f.status === 'IDEA')
   const queuedIdeas = ideas.filter(f => f.status === 'QUEUED')
@@ -188,41 +223,117 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     setIsSubmitting(true)
     const formData = new FormData(e.currentTarget)
     formData.append('status', 'IDEA')
-    if (selectedPersonMentions.length > 0) {
-      formData.append('personMentions', JSON.stringify(selectedPersonMentions))
-    }
+    formData.append('creatorId', selectedCreatorId)
+    
     try {
       const res = await createWork(formData)
       if (res.success) {
+        addToast('Proposal submitted successfully!', 'success')
         setShowAddForm(false)
-        setSelectedPersonMentions([])
         ;(e.target as HTMLFormElement).reset()
-      } else alert(res.error || 'Failed to submit proposal')
-    } catch (err) { console.error(err) }
-    finally { setIsSubmitting(false) }
+        router.refresh()
+      } else {
+        addToast(res.error || 'Failed to submit proposal', 'error')
+      }
+    } catch (err: any) { 
+      console.error(err) 
+      addToast(err.message || 'An error occurred', 'error')
+    } finally { 
+      setIsSubmitting(false) 
+    }
   }
 
   async function handleEditSubmit(e: React.FormEvent<HTMLFormElement>, ideaId: string) {
     e.preventDefault()
     setActionId(ideaId)
     const formData = new FormData(e.currentTarget)
+    editAssigneeIds.forEach(id => formData.append('assigneeIds', id))
+    
+    const days = editDurationMode === 'days' && editExpectedDays !== '' ? Number(editExpectedDays) : 0
+    const hours = editExpectedHours !== '' ? Number(editExpectedHours) : 0
+    const totalHours = editDurationMode === 'days' ? (days * 24) + hours : hours
+    if (totalHours > 0) {
+      formData.append('expectedDurationHours', totalHours.toString())
+    } else {
+      formData.append('expectedDurationHours', '0')
+    }
+
+    if (editDeadline) {
+      formData.append('dueDate', editDeadline.toISOString())
+    }
+    
     try {
       const res = await editWork(ideaId, formData)
       if (res.success) {
+        addToast('Proposal updated successfully!', 'success')
         setEditingId(null)
-      } else alert(res.error || 'Failed to update proposal')
-    } catch (err) {
+        router.refresh()
+      } else {
+        addToast(res.error || 'Failed to update proposal', 'error')
+      }
+    } catch (err: any) {
       console.error(err)
+      addToast(err.message || 'An error occurred', 'error')
     } finally {
       setActionId(null)
     }
   }
 
+  async function handleConvertSubmit(e: React.FormEvent<HTMLFormElement>, ideaId: string, ideaType: string) {
+    e.preventDefault()
+    setActionId(ideaId)
+    
+    const formData = new FormData()
+    convertAssigneeIds.forEach(id => formData.append('assigneeIds', id))
+    
+    const days = convertDurationMode === 'days' && convertExpectedDays !== '' ? Number(convertExpectedDays) : 0
+    const hours = convertExpectedHours !== '' ? Number(convertExpectedHours) : 0
+    const totalHours = convertDurationMode === 'days' ? (days * 24) + hours : hours
+    
+    if (totalHours > 0) {
+      formData.append('expectedDurationHours', totalHours.toString())
+    }
+    if (convertDeadline) {
+      formData.append('dueDate', convertDeadline.toISOString())
+    }
+
+    try {
+      const res = await convertIdeaToWork(ideaId, formData)
+      if (res.success) {
+        addToast('Converted proposal to active work!', 'success')
+        setConvertModalId(null)
+        router.refresh()
+      } else {
+        addToast(res.error || 'Failed to convert proposal', 'error')
+      }
+    } catch (err: any) { 
+      console.error(err) 
+      addToast(err.message || 'An error occurred', 'error')
+    } finally { 
+      setActionId(null) 
+    }
+  }
+
   async function handleVote(id: string) {
-    if (!currentUser) return alert('Please login to vote')
+    if (!currentUser) {
+      addToast('Please login to vote', 'error')
+      return
+    }
     setVotingId(id)
-    try { await toggleIdeaSupport(id) } catch (err) { console.error(err) }
-    finally { setVotingId(null) }
+    try { 
+      const res = await toggleIdeaSupport(id)
+      if (res && !res.success) {
+        addToast(res.error || 'Failed to vote', 'error')
+      } else {
+        addToast('Vote updated', 'success')
+        router.refresh()
+      }
+    } catch (err: any) { 
+      console.error(err) 
+      addToast(err.message || 'An error occurred', 'error')
+    } finally { 
+      setVotingId(null) 
+    }
   }
 
   async function handleDisagreeSubmit(e: React.FormEvent) {
@@ -232,11 +343,19 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     try {
       const res = await disagreeWithIdea(disagreeModalId, disagreeReason)
       if (res.success) {
+        addToast('Disagreement posted successfully', 'success')
         setDisagreeModalId(null)
         setDisagreeReason('')
-      } else alert(res.error || 'Failed to submit disagreement')
-    } catch (err) { console.error(err) }
-    finally { setIsDisagreeing(false) }
+        router.refresh()
+      } else {
+        addToast(res.error || 'Failed to submit disagreement', 'error')
+      }
+    } catch (err: any) { 
+      console.error(err) 
+      addToast(err.message || 'An error occurred', 'error')
+    } finally { 
+      setIsDisagreeing(false) 
+    }
   }
 
   async function handleReplySubmit(e: React.FormEvent, disagreeId: string) {
@@ -246,20 +365,37 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     try {
       const res = await replyToDisagree(disagreeId, replyContent)
       if (res.success) {
+        addToast('Reply submitted successfully', 'success')
         setReplyModalId(null)
         setReplyContent('')
-      } else alert(res.error || 'Failed to submit reply')
-    } catch (err) { console.error(err) }
-    finally { setIsReplying(false) }
+        router.refresh()
+      } else {
+        addToast(res.error || 'Failed to submit reply', 'error')
+      }
+    } catch (err: any) { 
+      console.error(err) 
+      addToast(err.message || 'An error occurred', 'error')
+    } finally { 
+      setIsReplying(false) 
+    }
   }
 
   async function handleAction(id: string, action: () => Promise<any>) {
     setActionId(id)
     try {
       const res = await action()
-      if (res && !res.success) alert(res.error || 'Action failed')
-    } catch (err) { console.error(err) }
-    finally { setActionId(null) }
+      if (res && !res.success) {
+        addToast(res.error || 'Action failed', 'error')
+      } else {
+        addToast('Action completed successfully', 'success')
+        router.refresh()
+      }
+    } catch (err: any) { 
+      console.error(err) 
+      addToast(err.message || 'An error occurred', 'error')
+    } finally { 
+      setActionId(null) 
+    }
   }
 
   async function handleAllAgree(ideaId: string) {
@@ -267,12 +403,18 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     try {
       const res = await adminAllAgree(ideaId)
       if (res.success) {
+        addToast('All Agree executed successfully', 'success')
         setAllAgreeId(null)
+        router.refresh()
       } else {
-        alert(res.error || 'Failed to execute All Agree')
+        addToast(res.error || 'Failed to execute All Agree', 'error')
       }
-    } catch (err) { console.error(err) }
-    finally { setActionId(null) }
+    } catch (err: any) { 
+      console.error(err) 
+      addToast(err.message || 'An error occurred', 'error')
+    } finally { 
+      setActionId(null) 
+    }
   }
 
   async function handleDelete(id: string) {
@@ -280,10 +422,57 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     try {
       const res = await deleteIdea(id)
       if (res.success) {
-        setDeleteConfirmId(null)
-      } else alert(res.error || 'Failed to delete')
-    } catch (err) { console.error(err) }
-    finally { setActionId(null) }
+        addToast('Proposal deleted successfully', 'success')
+        router.refresh()
+      } else {
+        addToast(res.error || 'Failed to delete proposal', 'error')
+      }
+    } catch (err: any) { 
+      console.error(err) 
+      addToast(err.message || 'An error occurred', 'error')
+    } finally { 
+      setActionId(null) 
+    }
+  }
+
+  async function handleDeleteClick(idea: any) {
+    const confirmed = await showConfirm({
+      title: 'Delete Proposal',
+      message: `Are you sure you want to delete "${idea.name}"? This action cannot be undone.`,
+      confirmText: 'Yes, Delete',
+      cancelText: 'Cancel',
+      danger: true
+    })
+    if (confirmed) {
+      await handleDelete(idea.id)
+    }
+  }
+
+  async function handlePermanentDeleteClick(idea: any) {
+    const confirmed = await showConfirm({
+      title: 'Permanently Delete Proposal',
+      message: `Are you sure you want to permanently delete "${idea.name}"? This action is irreversible and will remove all associated data and deduct any awarded points.`,
+      confirmText: 'Permanently Delete',
+      cancelText: 'Cancel',
+      danger: true
+    })
+    if (confirmed) {
+      setActionId(idea.id)
+      try {
+        const res = await permanentlyDeleteWork(idea.id)
+        if (res.success) {
+          addToast('Proposal permanently deleted', 'success')
+          router.refresh()
+        } else {
+          addToast(res.error || 'Failed to delete permanently', 'error')
+        }
+      } catch (err: any) {
+        console.error(err)
+        addToast(err.message || 'An error occurred', 'error')
+      } finally {
+        setActionId(null)
+      }
+    }
   }
 
   async function handleDeclineSubmit() {
@@ -292,11 +481,19 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     try {
       const res = await declineIdea(declineModalId, declineReason)
       if (res.success) {
+        addToast('Proposal declined successfully', 'success')
         setDeclineModalId(null)
         setDeclineReason('')
-      } else alert(res.error || 'Failed to decline')
-    } catch (err) { console.error(err) }
-    finally { setIsDeclining(false) }
+        router.refresh()
+      } else {
+        addToast(res.error || 'Failed to decline proposal', 'error')
+      }
+    } catch (err: any) { 
+      console.error(err) 
+      addToast(err.message || 'An error occurred', 'error')
+    } finally { 
+      setIsDeclining(false) 
+    }
   }
 
   const getPriorityBadge = (p: string) => {
@@ -314,7 +511,7 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
       case 'DECLINED': return 'bg-red-500/5 border-red-500/10 hover:border-red-500/20 opacity-80'
       case 'SHELVED': return 'bg-zinc-500/5 border-zinc-500/10 hover:border-zinc-500/20 opacity-75'
       case 'DELETED': return 'bg-zinc-950/40 border-red-500/10 hover:border-red-500/20 opacity-70'
-      default: return 'bg-[#09090b]/40 border-white/5 hover:border-white/10'
+      default: return 'bg-zinc-950/40 border-white/5 hover:border-white/10'
     }
   }
 
@@ -329,7 +526,6 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     const isDeleted = idea.status === 'DELETED'
     const isArchived = isDeclined || isShelved || isDeleted
 
-    // Edit Inline Render
     if (editingId === idea.id) {
       return (
         <motion.div 
@@ -371,6 +567,147 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                 </select>
               </div>
             </div>
+
+            {idea.type !== 'IDEA' && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[9px] uppercase text-zinc-500 font-bold">Assignees (Workers)</label>
+                  <div className="flex flex-wrap gap-1 p-2 bg-zinc-950/60 border border-white/10 rounded-xl min-h-[38px]">
+                    {members.filter(m => m.role !== 'ADMIN').map(m => (
+                      <button
+                        type="button"
+                        key={m.id}
+                        onClick={() => {
+                          if (editAssigneeIds.includes(m.id)) {
+                            setEditAssigneeIds(prev => prev.filter(id => id !== m.id))
+                          } else {
+                            setEditAssigneeIds(prev => [...prev, m.id])
+                          }
+                        }}
+                        className={`px-2 py-1 text-[9px] rounded-lg border transition-colors cursor-pointer ${
+                          editAssigneeIds.includes(m.id) 
+                          ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 font-bold' 
+                          : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
+                        }`}
+                      >
+                        {m.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-[9px] uppercase text-zinc-500 font-bold block">Expected Duration</label>
+                  
+                  {/* Segmented Toggle Control */}
+                  <div className="flex bg-zinc-950/80 p-0.5 border border-white/5 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditDurationMode('hours');
+                        setEditExpectedDays('');
+                      }}
+                      className={`flex-1 py-1.5 rounded-lg text-[9px] font-bold transition-all cursor-pointer ${
+                        editDurationMode === 'hours'
+                          ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400 font-black'
+                          : 'text-zinc-500 hover:text-zinc-300'
+                      }`}
+                    >
+                      <span className="flex items-center justify-center gap-1.5">
+                        <Zap size={10} />
+                        Hours Task
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditDurationMode('days')}
+                      className={`flex-1 py-1.5 rounded-lg text-[9px] font-bold transition-all cursor-pointer ${
+                        editDurationMode === 'days'
+                          ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400 font-black'
+                          : 'text-zinc-500 hover:text-zinc-300'
+                      }`}
+                    >
+                      <span className="flex items-center justify-center gap-1.5">
+                        <Calendar size={10} />
+                        Multi-Day Task
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="flex gap-3 items-start">
+                    {editDurationMode === 'hours' ? (
+                      <div className="flex-1 space-y-1">
+                        <CustomSelect 
+                          value={editExpectedHours}
+                          onChange={setEditExpectedHours}
+                          options={Array.from({ length: 24 }, (_, i) => i + 1).map((h) => ({
+                            value: h,
+                            label: `${h} ${h === 1 ? 'Hour' : 'Hours'}`
+                          }))}
+                          placeholder="Select Hours"
+                          borderColorClass="border-white/10 focus:border-amber-500/50"
+                        />
+                        <span className="text-[7px] text-zinc-500 font-bold block">1h = 1pt, 2-3h = 2pts, 4h+ = 5pts (max 5pts/day)</span>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex-1 space-y-1">
+                          <input 
+                            type="number" 
+                            min="1"
+                            placeholder="Days"
+                            value={editExpectedDays}
+                            onChange={(e) => {
+                              const val = e.target.value ? Number(e.target.value) : ''
+                              if (val !== '' && val < 1) {
+                                setEditExpectedDays(1)
+                              } else {
+                                setEditExpectedDays(val)
+                              }
+                            }}
+                            className="w-full bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-amber-500/50" 
+                          />
+                          <span className="text-[7px] text-zinc-500 font-bold block">1 Day = 5 Points</span>
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <CustomSelect 
+                            value={editExpectedHours === '' ? 0 : editExpectedHours}
+                            onChange={setEditExpectedHours}
+                            options={Array.from({ length: 25 }, (_, i) => i).map((h) => ({
+                              value: h,
+                              label: `${h} ${h === 1 ? 'Hour' : 'Hours'}`
+                            }))}
+                            placeholder="Select Extra Hours"
+                            borderColorClass="border-white/10 focus:border-amber-500/50"
+                          />
+                          <span className="text-[7px] text-zinc-500 font-bold block">Extra hours (max 24)</span>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Points Counter Badge */}
+                    <div className="bg-zinc-950/80 border border-amber-500/15 rounded-xl p-2 flex items-center justify-between min-w-[90px] text-center shadow-inner h-[38px] self-start">
+                      <div className="flex flex-col items-center justify-center w-full">
+                        <span className="text-xs font-black text-amber-400 leading-none">
+                          {calculatePoints(editDurationMode, editExpectedDays, editExpectedHours)}
+                        </span>
+                        <span className="text-[6px] uppercase tracking-wider text-zinc-500 font-black mt-0.5">Points</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="text-[9px] uppercase text-zinc-500 font-bold">Deadline</label>
+                  <DateTimePicker 
+                    value={editDeadline ? editDeadline.toISOString() : ''}
+                    onChange={(val: string) => setEditDeadline(val ? new Date(val) : null)}
+                    placeholder="Select Deadline"
+                    className="border-white/10 focus-within:border-amber-500/50"
+                  />
+                </div>
+              </div>
+            )}
             
             <div className="space-y-1">
               <label className="text-[9px] uppercase text-zinc-500 font-bold">Details / Explanation</label>
@@ -405,24 +742,208 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
       )
     }
 
+    if (convertModalId === idea.id) {
+      return (
+        <motion.div 
+          key={idea.id}
+          layout
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="bg-emerald-950/20 border border-emerald-500/20 p-4 sm:p-5 rounded-2xl space-y-4"
+        >
+          <form onSubmit={(e) => handleConvertSubmit(e, idea.id, idea.type || 'IDEA')} className="space-y-3">
+            <h4 className="text-xs font-bold text-white uppercase flex items-center gap-1.5">
+              <Play size={12} className="fill-emerald-400 text-emerald-400" /> Convert to Active Work
+            </h4>
+            
+            <p className="text-xs text-emerald-300/80 leading-relaxed mb-4">
+              The team has 100% consensus! You are about to convert "${idea.name}" into an active task. Please assign the responsible team members and estimate the hours required.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase text-zinc-500 font-bold">Assignees (Workers)</label>
+                <div className="flex flex-wrap gap-1 p-2 bg-zinc-950/60 border border-emerald-500/10 rounded-xl min-h-[38px]">
+                  {members.filter(m => m.role !== 'ADMIN').map(m => (
+                    <button
+                      type="button"
+                      key={m.id}
+                      onClick={() => {
+                        if (convertAssigneeIds.includes(m.id)) {
+                          setConvertAssigneeIds(prev => prev.filter(id => id !== m.id))
+                        } else {
+                          setConvertAssigneeIds(prev => [...prev, m.id])
+                        }
+                      }}
+                      className={`px-2 py-1 text-[9px] rounded-lg border transition-colors cursor-pointer ${
+                        convertAssigneeIds.includes(m.id) 
+                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 font-bold' 
+                        : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      {m.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-[9px] uppercase text-zinc-500 font-bold block">Expected Duration</label>
+                
+                {/* Segmented Toggle Control */}
+                <div className="flex bg-zinc-950/80 p-0.5 border border-white/5 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConvertDurationMode('hours');
+                      setConvertExpectedDays('');
+                    }}
+                    className={`flex-1 py-1.5 rounded-lg text-[9px] font-bold transition-all cursor-pointer ${
+                      convertDurationMode === 'hours'
+                        ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-black'
+                        : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    <span className="flex items-center justify-center gap-1.5">
+                      <Zap size={10} />
+                      Hours Task
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConvertDurationMode('days')}
+                    className={`flex-1 py-1.5 rounded-lg text-[9px] font-bold transition-all cursor-pointer ${
+                      convertDurationMode === 'days'
+                        ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-black'
+                        : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    <span className="flex items-center justify-center gap-1.5">
+                      <Calendar size={10} />
+                      Multi-Day Task
+                    </span>
+                  </button>
+                </div>
+
+                <div className="flex gap-3 items-start">
+                  {convertDurationMode === 'hours' ? (
+                    <div className="flex-1 space-y-1">
+                      <CustomSelect 
+                        value={convertExpectedHours}
+                        onChange={setConvertExpectedHours}
+                        options={Array.from({ length: 24 }, (_, i) => i + 1).map((h) => ({
+                          value: h,
+                          label: `${h} ${h === 1 ? 'Hour' : 'Hours'}`
+                        }))}
+                        placeholder="Select Hours"
+                        borderColorClass="border-emerald-500/10 focus:border-emerald-500/50"
+                      />
+                      <span className="text-[7px] text-emerald-500/70 font-bold block">1h = 1pt, 2-3h = 2pts, 4h+ = 5pts (max 5pts/day)</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex-1 space-y-1">
+                        <input 
+                          type="number" 
+                          min="1"
+                          placeholder="Days"
+                          value={convertExpectedDays}
+                          onChange={(e) => {
+                            const val = e.target.value ? Number(e.target.value) : ''
+                            if (val !== '' && val < 1) {
+                              setConvertExpectedDays(1)
+                            } else {
+                              setConvertExpectedDays(val)
+                            }
+                          }}
+                          className="w-full bg-zinc-950/60 border border-emerald-500/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/50" 
+                        />
+                        <span className="text-[7px] text-emerald-500/70 font-bold block">1 Day = 5 Points</span>
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <CustomSelect 
+                          value={convertExpectedHours === '' ? 0 : convertExpectedHours}
+                          onChange={setConvertExpectedHours}
+                          options={Array.from({ length: 25 }, (_, i) => i).map((h) => ({
+                            value: h,
+                            label: `${h} ${h === 1 ? 'Hour' : 'Hours'}`
+                          }))}
+                          placeholder="Select Extra Hours"
+                          borderColorClass="border-emerald-500/10 focus:border-emerald-500/50"
+                        />
+                        <span className="text-[7px] text-emerald-500/70 font-bold block">Extra hours (max 24)</span>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Points Counter Badge */}
+                  <div className="bg-zinc-950/80 border border-emerald-500/15 rounded-xl p-2 flex items-center justify-between min-w-[90px] text-center shadow-inner h-[38px] self-start">
+                    <div className="flex flex-col items-center justify-center w-full">
+                      <span className="text-xs font-black text-emerald-400 leading-none">
+                        {calculatePoints(convertDurationMode, convertExpectedDays, convertExpectedHours)}
+                      </span>
+                      <span className="text-[6px] uppercase tracking-wider text-zinc-500 font-black mt-0.5">Points</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase text-zinc-500 font-bold">Deadline</label>
+                <DateTimePicker 
+                  value={convertDeadline ? convertDeadline.toISOString() : ''}
+                  onChange={(val: string) => setConvertDeadline(val ? new Date(val) : null)}
+                  placeholder="Select Deadline"
+                  className="border-emerald-500/10 focus-within:border-emerald-500/50"
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-2 pt-2 mt-2 border-t border-emerald-500/10">
+              <button 
+                type="button" 
+                onClick={() => setConvertModalId(null)} 
+                className="text-xs bg-white/5 hover:bg-white/10 px-3 py-2 rounded-xl text-zinc-400 hover:text-white cursor-pointer font-bold transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                disabled={actionId === idea.id} 
+                className="text-xs bg-emerald-500 text-black hover:bg-emerald-400 px-4 py-2 rounded-xl font-bold disabled:opacity-50 cursor-pointer flex items-center gap-1.5 transition-all shadow-md shadow-emerald-500/5"
+              >
+                {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : (idea.type === 'IDEA' ? 'Approve Idea' : 'Confirm Conversion')}
+              </button>
+            </div>
+          </form>
+        </motion.div>
+      )
+    }
+
     return (
       <motion.div 
         key={idea.id}
         layout
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`border p-4 sm:p-5 md:p-6 rounded-2xl sm:rounded-3xl space-y-4 transition-all ${getStatusStyle(idea.status)}`}
+        className={`border-b md:border p-4 md:p-6 md:rounded-3xl space-y-4 transition-all ${getStatusStyle(idea.status)}`}
       >
-        {/* Top Header Area: Title & Badges */}
         <div className="flex flex-col gap-2">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
-            <div className="flex flex-wrap items-center gap-2 min-w-0">
-              <h4 className={`text-sm sm:text-base font-bold tracking-tight ${isArchived ? 'text-zinc-400 line-through' : 'text-white'}`}>
+            <div className="flex flex-wrap items-center gap-2 min-w-0 cursor-pointer group/title" onClick={() => router.push(`/works/${idea.id}`)}>
+              <h4 className={`text-sm sm:text-base font-bold tracking-tight transition-colors group-hover/title:text-[#63BDF2] ${isArchived ? 'text-zinc-400 line-through' : 'text-white'}`}>
                 {idea.name}
               </h4>
               <div className="flex flex-wrap gap-1.5 shrink-0">
                 <span className={`text-[9px] px-2 py-0.5 rounded-md border font-black uppercase tracking-wider ${getPriorityBadge(idea.priority)}`}>
                   {idea.priority}
+                </span>
+                <span className={`text-[9px] px-2 py-0.5 rounded-md border font-black uppercase tracking-wider ${
+                  idea.type === 'ACTION' 
+                    ? 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20'
+                    : 'text-fuchsia-400 bg-fuchsia-500/10 border-fuchsia-500/20'
+                }`}>
+                  {idea.type === 'ACTION' ? 'Action' : 'Idea'}
                 </span>
                 {isQueued && (
                   <span className="text-[9px] px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/25 text-purple-400 font-bold uppercase tracking-wider flex items-center gap-1">
@@ -452,7 +973,6 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
             {idea.description}
           </p>
 
-          {/* Mentions / Idea Creators */}
           {idea.personMentions && idea.personMentions.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-4">
               <span className="text-[10px] font-bold text-yellow-500/70 uppercase tracking-wider flex items-center mr-1">Creators:</span>
@@ -465,7 +985,6 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
           )}
         </div>
 
-        {/* Decline Reason Banner */}
         {isDeclined && idea.blockedReason && (
           <div className="flex items-start gap-2.5 bg-red-500/5 border border-red-500/10 rounded-xl p-3 sm:p-4 mt-1">
             <AlertTriangle size={14} className="text-red-400 shrink-0 mt-0.5" />
@@ -476,19 +995,23 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
           </div>
         )}
 
-        {/* Born Info / Origin Details */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-3 border-t border-white/5 text-[10px] text-zinc-500">
           <div className="flex items-center gap-1.5">
             <div className="shrink-0">
               {idea.creator?.profilePhoto ? (
                 <img src={idea.creator.profilePhoto} alt={idea.creator.name} className="w-4 h-4 rounded-full object-cover ring-1 ring-white/10" />
               ) : (
-                <div className="w-4 h-4 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-[7px] uppercase">
+                <div className="w-4 h-4 rounded-full bg-zinc-800 text-zinc-400 flex items-center justify-center font-bold text-[7px] uppercase">
                   {idea.creator?.name?.charAt(0) || '?'}
                 </div>
               )}
             </div>
             <span>By <strong className="text-zinc-300 font-medium">{idea.creator?.name || 'Unknown'}</strong></span>
+            {idea.creator && (
+              <span className="text-[7px] text-muted-foreground border border-white/10 px-1 py-0.2 rounded font-bold uppercase tracking-widest bg-white/5 ml-1">
+                {idea.creator.customRole || idea.creator.role}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1" suppressHydrationWarning>
             <Calendar size={11} className="text-zinc-600" />
@@ -500,10 +1023,7 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
           </div>
         </div>
 
-        {/* Card Footer: Support and Action Controls */}
         <div className="border-t border-white/5 pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          
-          {/* Left Side: Support Progress or Meta Status */}
           <div className="flex-1 min-w-0">
             {!isArchived ? (
               <div className="space-y-2">
@@ -520,7 +1040,7 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                 </div>
                 <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
                   <div 
-                    className="bg-gradient-to-r from-[#63BDF2] to-blue-500 h-full rounded-full transition-all duration-500 ease-out" 
+                    className="bg-gradient-to-r from-blue-400 to-blue-500 h-full rounded-full transition-all duration-500 ease-out" 
                     style={{ width: `${Math.min(100, approvalRate)}%` }} 
                   />
                 </div>
@@ -536,44 +1056,39 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
             )}
           </div>
 
-          {/* Right Side: Action Trigger Trays */}
           <div className="flex flex-wrap items-center gap-1.5 sm:justify-end shrink-0">
-            
-            {/* For OPEN/QUEUED proposals */}
             {!isArchived && (
               <>
                 {currentUser?.role !== 'ADMIN' && (
                   <>
                   <button
                     onClick={() => handleVote(idea.id)}
-                  disabled={votingId === idea.id}
-                  className={`text-xs px-3.5 py-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer select-none active:scale-95 ${
-                    userVoted 
-                      ? 'bg-[#63BDF2]/15 border border-[#63BDF2]/35 text-[#63BDF2] hover:bg-[#63BDF2]/25' 
-                      : 'bg-white/5 border border-white/10 text-white hover:bg-white/10'
-                  }`}
-                >
-                  {votingId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <ThumbsUp size={12} className={userVoted ? 'fill-[#63BDF2]' : ''} />}
-                  <span>{userVoted ? 'Agreed' : 'Agree'}</span>
-                </button>
+                    disabled={votingId === idea.id}
+                    className={`text-xs px-3.5 py-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer select-none active:scale-95 ${
+                      userVoted 
+                        ? 'bg-blue-500/15 border border-blue-500/35 text-blue-400 hover:bg-blue-500/25' 
+                        : 'bg-white/5 border border-white/10 text-white hover:bg-white/10'
+                    }`}
+                  >
+                    {votingId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <ThumbsUp size={12} className={userVoted ? 'fill-blue-400' : ''} />}
+                    <span>{userVoted ? 'Agreed' : 'Agree'}</span>
+                  </button>
 
-                <button
-                  onClick={() => userDisagreed ? handleAction(idea.id, () => removeDisagree(idea.id)) : setDisagreeModalId(idea.id)}
-                  disabled={actionId === idea.id}
-                  className={`text-xs px-3.5 py-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer select-none active:scale-95 ${
-                    userDisagreed 
-                      ? 'bg-red-500/15 border border-red-500/35 text-red-400 hover:bg-red-500/25' 
-                      : 'bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10'
-                  }`}
-                  title="Disagree with this proposal"
-                >
-                  {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <ThumbsDown size={12} className={userDisagreed ? 'fill-red-500' : ''} />}
-                  <span>{userDisagreed ? 'Disagreed' : 'Disagree'}</span>
-                </button>
+                  <button
+                    onClick={() => userDisagreed ? handleAction(idea.id, () => removeDisagree(idea.id)) : setDisagreeModalId(idea.id)}
+                    disabled={actionId === idea.id}
+                    className={`text-xs px-3.5 py-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer select-none active:scale-95 ${
+                      userDisagreed 
+                        ? 'bg-red-500/15 border border-red-500/35 text-red-400 hover:bg-red-500/25' 
+                        : 'bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <ThumbsDown size={12} className={userDisagreed ? 'fill-red-400' : ''} />}
+                    <span>{userDisagreed ? 'Disagreed' : 'Disagree'}</span>
+                  </button>
                   </>
                 )}
 
-                {/* ALL AGREE — Super Admin Only, hidden if anyone has disagreed */}
                 {isAdmin && approvalRate < 100 && (!idea.disagrees || idea.disagrees.length === 0) && (
                   allAgreeId === idea.id ? (
                     <div className="flex items-center gap-1">
@@ -596,7 +1111,6 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                     <button
                       onClick={() => setAllAgreeId(idea.id)}
                       className="text-xs bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border border-amber-500/25 text-amber-400 px-3 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none active:scale-95"
-                      title="Mark all members as agreed (Super Admin only). Each member's name will be shown, with a note that this was done via All Agree."
                     >
                       <Users size={12} />
                       <span>All Agree</span>
@@ -613,19 +1127,25 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                         isQueued 
                           ? 'bg-purple-500/15 border border-purple-500/35 text-purple-400' 
                           : 'bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10'
-                      }`} 
-                      title={isQueued ? 'Remove from Queue' : 'Add to Queue'}
+                      }`}
                     >
                       {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <ListOrdered size={12} />}
                     </button>
 
-                    {/* Convert to Work — ONLY at 100% consensus */}
                     {approvalRate >= 100 ? (
                       <button 
-                        onClick={() => handleAction(idea.id, () => updateWorkStatus(idea.id, 'ACTIVE'))} 
+                        onClick={() => {
+                          setConvertModalId(idea.id)
+                          setConvertAssigneeIds(idea.assignees?.map(a => a.id) || [])
+                          const totalHours = idea.expectedDurationHours || 0
+                          const isMultiDay = totalHours >= 24
+                          setConvertDurationMode(isMultiDay ? 'days' : 'hours')
+                          setConvertExpectedDays(isMultiDay ? Math.floor(totalHours / 24) : '')
+                          setConvertExpectedHours(isMultiDay ? totalHours % 24 : totalHours || '')
+                          setConvertDeadline(idea.dueDate ? new Date(idea.dueDate) : null)
+                        }} 
                         disabled={actionId === idea.id}
                         className="text-xs bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-400 px-3 py-2.5 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer select-none animate-pulse hover:animate-none active:scale-95"
-                        title="All members agreed — Convert to Active Work"
                       >
                         {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <Play size={10} className="fill-emerald-400 text-emerald-400" />}
                         <span>Convert</span>
@@ -633,7 +1153,6 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                     ) : (
                       <div 
                         className="text-[9px] text-zinc-500 bg-zinc-900/40 border border-white/5 px-2.5 py-2 rounded-xl font-bold flex items-center gap-1 select-none cursor-not-allowed" 
-                        title={`Need ${membersCount - idea.supports.length} more agreements to convert`}
                       >
                         <Play size={10} className="text-zinc-700" />
                         <span>{approvalRate}%</span>
@@ -643,7 +1162,6 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                     <button 
                       onClick={() => setDeclineModalId(idea.id)}
                       className="text-xs bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 text-red-400 p-2 rounded-xl font-bold flex items-center justify-center transition-all cursor-pointer select-none active:scale-95"
-                      title="Decline Proposal"
                     >
                       <XCircle size={12} />
                     </button>
@@ -651,57 +1169,41 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                     <button 
                       onClick={() => handleAction(idea.id, () => shelveIdea(idea.id))}
                       className="text-xs bg-zinc-500/5 hover:bg-zinc-500/10 border border-zinc-500/10 text-zinc-400 p-2 rounded-xl font-bold flex items-center justify-center transition-all cursor-pointer select-none active:scale-95"
-                      title="Shelve for Later"
                     >
                       <Archive size={12} />
                     </button>
 
-                    {/* Edit Details */}
                     <button 
                       onClick={() => {
                         setEditingId(idea.id)
                         setEditName(idea.name)
                         setEditPriority(idea.priority)
                         setEditDescription(idea.description)
+                        const totalHours = idea.expectedDurationHours || 0
+                        const isMultiDay = totalHours >= 24
+                        setEditDurationMode(isMultiDay ? 'days' : 'hours')
+                        setEditExpectedDays(isMultiDay ? Math.floor(totalHours / 24) : '')
+                        setEditExpectedHours(isMultiDay ? totalHours % 24 : totalHours || '')
+                        setEditDeadline(idea.dueDate ? new Date(idea.dueDate) : null)
+                        setEditAssigneeIds(idea.assignees?.map(a => a.id) || [])
                       }}
                       className="text-xs bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-400 hover:text-white p-2 rounded-xl font-bold flex items-center justify-center transition-all cursor-pointer select-none active:scale-95"
-                      title="Edit Details"
                     >
                       <Edit2 size={12} />
                     </button>
 
-                    {/* Delete Proposal */}
-                    {deleteConfirmId === idea.id ? (
-                      <div className="flex items-center gap-1 bg-red-500/15 border border-red-500/35 rounded-xl p-0.5 animate-fadeIn">
-                        <button 
-                          onClick={() => handleDelete(idea.id)} 
-                          disabled={actionId === idea.id}
-                          className="text-[9px] bg-red-500 hover:bg-red-650 text-white px-2 py-0.5 rounded font-bold transition-all cursor-pointer"
-                        >
-                          {actionId === idea.id ? <Loader2 size={10} className="animate-spin" /> : 'Yes'}
-                        </button>
-                        <button 
-                          onClick={() => setDeleteConfirmId(null)}
-                          className="text-[9px] bg-white/5 hover:bg-white/10 text-zinc-400 px-2 py-0.5 rounded font-bold transition-all cursor-pointer"
-                        >
-                          No
-                        </button>
-                      </div>
-                    ) : (
-                      <button 
-                        onClick={() => setDeleteConfirmId(idea.id)}
-                        className="text-xs bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 text-red-400 p-2 rounded-xl font-bold flex items-center justify-center transition-all cursor-pointer select-none active:scale-95"
-                        title="Delete Proposal"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    )}
+                    <button 
+                      onClick={() => handleDeleteClick(idea)}
+                      disabled={actionId === idea.id}
+                      className="text-xs bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 text-red-400 p-2 rounded-xl font-bold flex items-center justify-center transition-all cursor-pointer select-none active:scale-95 disabled:opacity-50"
+                    >
+                      {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                    </button>
                   </>
                 )}
               </>
             )}
 
-            {/* For DECLINED/SHELVED proposals */}
             {isArchived && !isDeleted && (
               <>
                 {canManage(idea) && (
@@ -716,52 +1218,40 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                 )}
 
                 {canManage(idea) && (
-                  <div className="flex items-center gap-1.5">
-                    {deleteConfirmId === idea.id ? (
-                      <>
-                        <button 
-                          onClick={() => handleDelete(idea.id)} 
-                          disabled={actionId === idea.id}
-                          className="text-xs bg-red-500 text-white hover:bg-red-655 px-3 py-2 rounded-xl font-bold transition-all cursor-pointer"
-                        >
-                          {actionId === idea.id ? <Loader2 size={10} className="animate-spin" /> : 'Yes, Delete'}
-                        </button>
-                        <button 
-                          onClick={() => setDeleteConfirmId(null)}
-                          className="text-xs bg-white/5 hover:bg-white/10 text-zinc-400 px-2.5 py-2 rounded-xl font-bold transition-all cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <button 
-                        onClick={() => setDeleteConfirmId(idea.id)}
-                        className="text-xs bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 text-red-400 p-2 rounded-xl font-bold flex items-center justify-center transition-all cursor-pointer select-none active:scale-95"
-                        title="Delete Permanently"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    )}
-                  </div>
+                  <button 
+                    onClick={() => handleDeleteClick(idea)}
+                    disabled={actionId === idea.id}
+                    className="text-xs bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 text-red-400 p-2 rounded-xl font-bold flex items-center justify-center transition-all cursor-pointer select-none active:scale-95 disabled:opacity-50"
+                  >
+                    {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                  </button>
                 )}
               </>
             )}
 
-            {/* For DELETED proposals */}
             {isDeleted && canManage(idea) && (
-              <button 
-                onClick={() => handleAction(idea.id, () => reviveIdea(idea.id))} 
-                disabled={actionId === idea.id}
-                className="text-xs bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/25 text-emerald-400 px-4 py-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer select-none active:scale-95"
-              >
-                {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
-                <span>Restore Proposal</span>
-              </button>
+              <>
+                <button 
+                  onClick={() => handleAction(idea.id, () => reviveIdea(idea.id))} 
+                  disabled={actionId === idea.id}
+                  className="text-xs bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/25 text-emerald-400 px-4 py-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer select-none active:scale-95"
+                >
+                  {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                  <span>Restore Proposal</span>
+                </button>
+                <button 
+                  onClick={() => handlePermanentDeleteClick(idea)} 
+                  disabled={actionId === idea.id}
+                  className="text-xs bg-red-500/15 hover:bg-red-500/25 border border-red-500/25 text-red-400 px-4 py-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer select-none active:scale-95"
+                >
+                  {actionId === idea.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                  <span>Permanently Delete</span>
+                </button>
+              </>
             )}
           </div>
         </div>
 
-        {/* Agreement Support List */}
         {!isArchived && idea.supports.length > 0 && (
           <div className="pt-2 space-y-1.5 border-t border-white/5">
             <span className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider">Agreement Timeline:</span>
@@ -771,17 +1261,16 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                   {v.user.profilePhoto ? (
                     <img src={v.user.profilePhoto} alt={v.user.name} className="w-3.5 h-3.5 rounded-full object-cover" />
                   ) : (
-                    <div className="w-3.5 h-3.5 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-[6px] uppercase">{v.user.name.charAt(0)}</div>
+                    <div className="w-3.5 h-3.5 rounded-full bg-zinc-800 text-zinc-400 flex items-center justify-center font-bold text-[6px] uppercase">{v.user.name.charAt(0)}</div>
                   )}
                   <span className="text-[10px] font-bold text-zinc-300">{v.user.name}</span>
-                  <span className="text-[9px] text-zinc-550" suppressHydrationWarning>• {formatRelativeTime(v.createdAt)}</span>
+                  <span className="text-[9px] text-zinc-500" suppressHydrationWarning>• {formatRelativeTime(v.createdAt)}</span>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Disagreements List */}
         {!isArchived && idea.disagrees && idea.disagrees.length > 0 && (
           <div className="pt-3 space-y-3 border-t border-white/5">
             <span className="text-[9px] uppercase font-bold text-red-500 tracking-wider">Disagreements / Concerns:</span>
@@ -799,7 +1288,6 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                   </div>
                   <p className="text-xs text-zinc-300 pl-5 leading-relaxed">{d.reason}</p>
                   
-                  {/* Replies */}
                   {d.replies.length > 0 && (
                     <div className="pl-5 space-y-2 mt-2 pt-2 border-t border-white/5">
                       {d.replies.map(r => (
@@ -817,7 +1305,6 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                     </div>
                   )}
 
-                  {/* Reply Button */}
                   <button 
                     onClick={() => setReplyModalId(d.id)}
                     className="absolute top-2 right-2 text-[9px] text-zinc-500 hover:text-white flex items-center gap-1 bg-white/5 hover:bg-white/10 px-2 py-1 rounded transition-colors"
@@ -825,17 +1312,16 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                     <MessageSquare size={10} /> Reply
                   </button>
 
-                  {/* Reply Form */}
                   <AnimatePresence>
                     {replyModalId === d.id && (
                       <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden pl-5 mt-2">
                         <form onSubmit={(e) => handleReplySubmit(e, d.id)} className="flex items-end gap-2">
-                          <div className="flex-1 bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2 flex items-center focus-within:border-white/30 transition-colors">
+                          <div className="flex-1 bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2 flex items-center focus-within:border-white/30 transition-colors">
                             <input
                               type="text"
                               value={replyContent}
                               onChange={(e) => setReplyContent(e.target.value)}
-                              placeholder="Type a reply (you can use @mentions)..."
+                              placeholder="Type a reply..."
                               className="w-full bg-transparent text-[10px] text-white focus:outline-none"
                               autoFocus
                             />
@@ -856,7 +1342,6 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
           </div>
         )}
 
-        {/* Disagree Modal Form */}
         <AnimatePresence>
           {disagreeModalId === idea.id && (
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
@@ -867,9 +1352,9 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                 <textarea 
                   value={disagreeReason}
                   onChange={e => setDisagreeReason(e.target.value)}
-                  placeholder="Explain your concerns so the team can discuss and resolve them..."
+                  placeholder="Explain your concerns..."
                   rows={2}
-                  className="w-full bg-[#0c0d12]/60 border border-red-500/20 rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-red-500/50 resize-none"
+                  className="w-full bg-zinc-950/60 border border-red-500/20 rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-red-500/50 resize-none"
                   autoFocus
                 />
                 <div className="flex justify-end gap-2">
@@ -883,7 +1368,6 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
           )}
         </AnimatePresence>
 
-        {/* Activity Log Audit Timeline */}
         {idea.activityLogs && idea.activityLogs.length > 0 && (
           <div className="border-t border-white/5 pt-3">
             <button onClick={() => setExpandedId(isExpanded ? null : idea.id)}
@@ -905,8 +1389,8 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                             ) : (
                               <div className="w-3.5 h-3.5 rounded-full bg-zinc-700 text-zinc-400 flex items-center justify-center text-[6px] font-bold uppercase">{log.user?.name?.charAt(0) || '?'}</div>
                             )}
-                            <span className="text-[10px] font-bold text-zinc-400">{log.user?.name || 'System'}</span>
-                            <span className="text-[9px] text-zinc-550" suppressHydrationWarning>• {formatDateTime(log.createdAt)}</span>
+                             <span className="text-[10px] font-bold text-zinc-400">{log.user?.name || 'System'}</span>
+                            <span className="text-[9px] text-zinc-500" suppressHydrationWarning>• {formatDateTime(log.createdAt)}</span>
                           </div>
                           <p className="text-[10px] text-zinc-500 leading-relaxed pl-5">{log.details || log.action}</p>
                         </div>
@@ -922,7 +1406,6 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     )
   }
 
-  // Tab config with counts
   const tabs = [
     { key: 'open' as const, label: 'Open Ideas', icon: <Lightbulb size={12} />, count: openIdeas.length, color: '' },
     { key: 'queued' as const, label: 'Queue', icon: <ListOrdered size={12} />, count: queuedIdeas.length, color: '' },
@@ -939,25 +1422,24 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
     deletedIdeas
   
   const emptyMessages: Record<string, string> = {
-    open: 'No open proposals right now. Click "New Proposal" to share your idea!',
-    queued: 'No ideas in execution queue. Move ideas here when the team agrees.',
-    declined: 'No declined proposals. Ideas that don\'t pass team review appear here with reasons.',
-    shelved: 'No shelved proposals. Ideas saved for future reconsideration appear here.',
-    deleted: 'No deleted proposals. Deleted ideas appear here with their complete history.',
+    open: 'No open proposals right now.',
+    queued: 'No ideas in execution queue.',
+    declined: 'No declined proposals.',
+    shelved: 'No shelved proposals.',
+    deleted: 'No deleted proposals.',
   }
 
   const bannerMessages: Record<string, { icon: React.ReactNode; color: string; text: string } | null> = {
     open: null,
-    queued: { icon: <ArrowRightCircle size={14} className="shrink-0 mt-0.5 text-purple-400" />, color: 'bg-purple-500/5 border-purple-500/10 text-purple-300/80', text: 'Execution Queue — Ideas approved by the team, waiting to start as Active Work. Admin or creator can click the play button to begin.' },
-    declined: { icon: <AlertTriangle size={14} className="shrink-0 mt-0.5 text-red-400" />, color: 'bg-red-500/5 border-red-500/10 text-red-300/70', text: 'Declined Archive — These proposals were reviewed but not approved. Each has a documented reason. They can be revived if the situation changes, or permanently deleted.' },
-    shelved: { icon: <Pause size={14} className="shrink-0 mt-0.5 text-zinc-400" />, color: 'bg-zinc-500/5 border-zinc-500/10 text-zinc-300/70', text: 'Shelved Ideas — Not rejected, just paused. These might be reconsidered in the future when timing or resources are better. Revive anytime.' },
-    deleted: { icon: <Trash2 size={14} className="shrink-0 mt-0.5 text-zinc-500" />, color: 'bg-zinc-500/5 border-zinc-500/10 text-zinc-300/70', text: 'Deleted Archives — Proposals deleted by their creator or an admin. Full history, dates, and agreement timelines are preserved for audit purposes.' },
+    queued: { icon: <ArrowRightCircle size={14} className="shrink-0 mt-0.5 text-purple-400" />, color: 'bg-purple-500/5 border-purple-500/10 text-purple-300/80', text: 'Execution Queue — Ideas approved by the team.' },
+    declined: { icon: <AlertTriangle size={14} className="shrink-0 mt-0.5 text-red-400" />, color: 'bg-red-500/5 border-red-500/10 text-red-300/70', text: 'Declined Archive — Proposals reviewed but not approved.' },
+    shelved: { icon: <Pause size={14} className="shrink-0 mt-0.5 text-zinc-400" />, color: 'bg-zinc-500/5 border-zinc-500/10 text-zinc-300/70', text: 'Shelved Ideas — Paused for later.' },
+    deleted: { icon: <Trash2 size={14} className="shrink-0 mt-0.5 text-zinc-500" />, color: 'bg-zinc-500/5 border-zinc-500/10 text-zinc-300/70', text: 'Deleted Archives — Past history preserved.' },
   }
 
   return (
-    <div className="bg-secondary/15 border border-border/30 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 space-y-6">
-      {/* Title Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/30">
+    <div className="bg-zinc-950/20 border border-white/5 rounded-xl md:rounded-3xl p-4 sm:p-6 md:p-8 space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
         <div className="flex items-center gap-2 min-w-0">
           <Lightbulb className="text-yellow-400 shrink-0" size={20} />
           <h2 className="text-base sm:text-lg font-bold text-white tracking-tight truncate">Proposals & Ideas</h2>
@@ -969,28 +1451,34 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
         {!isAdmin && (
           <button 
             onClick={() => setShowAddForm(!showAddForm)}
-            className="text-xs bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-500 hover:to-amber-600 text-black px-4 py-2.5 rounded-xl font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer select-none shrink-0 w-full sm:w-auto shadow-md shadow-yellow-500/10 active:scale-95 border-0"
+            className="text-xs bg-yellow-500 hover:bg-yellow-400 text-black px-4 py-2.5 rounded-xl font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer select-none shrink-0 w-full sm:w-auto shadow-md shadow-yellow-500/10 active:scale-95 border-0"
           >
             <Plus size={14} className="stroke-[3]" /> New Proposal
           </button>
         )}
       </div>
 
-      {/* Add Idea Form */}
       <AnimatePresence>
         {showAddForm && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
             <form onSubmit={handleAddIdea} className="bg-zinc-950/40 border border-white/5 p-4 sm:p-5 rounded-2xl space-y-4">
               <h3 className="text-xs font-bold text-white uppercase tracking-wider">Submit New Proposal</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-[10px] uppercase text-zinc-500 font-bold">Proposal Title</label>
-                  <input type="text" name="name" required placeholder="e.g., Weekly Team Meetup or Client Dashboard Redesign"
-                    className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-yellow-500/50" />
+                  <input type="text" name="name" required placeholder="e.g., Weekly Team Meetup"
+                    className="w-full bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-yellow-500/50" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase text-zinc-500 font-bold">Proposal Type</label>
+                  <select name="type" className="w-full bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-yellow-500/50">
+                    <option value="IDEA">Idea (10pts on finish)</option>
+                    <option value="ACTION">Action (Timed pts)</option>
+                  </select>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] uppercase text-zinc-500 font-bold">Priority</label>
-                  <select name="priority" className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-yellow-500/50">
+                  <select name="priority" className="w-full bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-yellow-500/50">
                     <option value="LOW">LOW</option>
                     <option value="MEDIUM">MEDIUM</option>
                     <option value="HIGH">HIGH</option>
@@ -1000,28 +1488,21 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
               </div>
               <div className="space-y-1.5">
                 <label className="text-[10px] uppercase text-zinc-500 font-bold">Details / Explanation</label>
-                <textarea name="description" required rows={3} placeholder="Explain the idea, benefits, or workflow in detail..."
-                  className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-yellow-500/50 resize-none" />
+                <textarea name="description" required rows={3} placeholder="Explain the idea..."
+                  className="w-full bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-yellow-500/50 resize-none" />
               </div>
               
-              {/* Mentions Row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-white/5 pt-4 mt-2">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-yellow-500 uppercase tracking-wider">Idea Creators (10 pts)</label>
-                  <div className="flex flex-wrap gap-1.5 p-2 bg-[#0c0d12]/60 border border-white/10 rounded-xl min-h-[38px]">
+                  <label className="text-[10px] font-bold text-yellow-500 uppercase tracking-wider">Idea Creator / Author (10 pts)</label>
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-zinc-950/60 border border-white/10 rounded-xl min-h-[38px]">
                      {members.filter(m => m.role !== 'ADMIN').map(m => (
                        <button
                          type="button"
                          key={m.id}
-                         onClick={() => {
-                           if (selectedPersonMentions.includes(m.id)) {
-                             setSelectedPersonMentions(prev => prev.filter(id => id !== m.id))
-                           } else {
-                             setSelectedPersonMentions(prev => [...prev, m.id])
-                           }
-                         }}
+                         onClick={() => setSelectedCreatorId(m.id)}
                          className={`px-2 py-1 text-[9px] rounded-lg border transition-colors cursor-pointer ${
-                           selectedPersonMentions.includes(m.id) 
+                           selectedCreatorId === m.id 
                            ? 'bg-purple-500/20 border-purple-500/50 text-purple-400 font-bold' 
                            : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
                          }`}
@@ -1036,7 +1517,7 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
                   <label htmlFor="parentWorkId" className="text-[10px] font-bold text-yellow-500 uppercase tracking-wider">Parent Work (10 pts)</label>
                   <select
                     name="parentWorkId"
-                    className="w-full bg-[#0c0d12]/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-yellow-500/50 transition-all"
+                    className="w-full bg-zinc-950/60 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-yellow-500/50 transition-all"
                   >
                     <option value="">None (Standalone)</option>
                     {works.map((w) => (
@@ -1050,7 +1531,7 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
 
               <div className="flex justify-end gap-2 pt-1">
                 <button type="button" onClick={() => setShowAddForm(false)} className="text-xs bg-white/5 hover:bg-white/10 px-3.5 py-2 rounded-xl text-zinc-400 hover:text-white cursor-pointer font-bold">Cancel</button>
-                <button type="submit" disabled={isSubmitting} className="text-xs bg-yellow-500 text-black hover:bg-yellow-450 px-4 py-2 rounded-xl font-bold disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-md shadow-yellow-500/5">
+                <button type="submit" disabled={isSubmitting} className="text-xs bg-yellow-500 text-black hover:bg-yellow-400 px-4 py-2 rounded-xl font-bold disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-md shadow-yellow-500/5">
                   {isSubmitting ? <Loader2 size={12} className="animate-spin" /> : 'Submit Proposal'}
                 </button>
               </div>
@@ -1088,13 +1569,13 @@ export default function IdeaAgreementHub({ ideas, currentUser, membersCount }: I
       )}
 
       {/* Card Listing */}
-      <div className="space-y-4">
+      <div className="space-y-0 md:space-y-4">
         {currentList.length === 0 ? (
-          <div className="text-center py-12 bg-[#09090b]/10 border border-dashed border-white/5 rounded-3xl text-muted-foreground text-xs italic">
+          <div className="text-center py-12 bg-[#09090b]/10 border border-dashed border-white/5 md:rounded-3xl text-muted-foreground text-xs italic">
             {emptyMessages[activeTab]}
           </div>
         ) : (
-          <div className="space-y-4">{currentList.map(idea => renderIdeaCard(idea))}</div>
+          <div className="flex flex-col md:gap-4">{currentList.map(idea => renderIdeaCard(idea))}</div>
         )}
       </div>
 

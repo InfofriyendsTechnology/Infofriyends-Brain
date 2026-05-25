@@ -15,7 +15,6 @@ async function logActivity(action: string, userId: string, workId?: string, deta
 export async function createWork(formData: FormData) {
   const session = await getSession()
   if (!session) return { success: false, error: 'Unauthorized' }
-  if (session.user.role === 'ADMIN') return { success: false, error: 'Admins cannot participate in ideas' }
   const user = session.user
 
   const name = formData.get('name') as string
@@ -24,6 +23,7 @@ export async function createWork(formData: FormData) {
   const status = formData.get('status') as string || 'IDEA'
   const dueDateStr = formData.get('dueDate') as string
   const parentWorkId = formData.get('parentWorkId') as string || null
+  const creatorId = (formData.get('creatorId') as string) || user.id
   
   // Assignees
   const assigneeIdsRaw = formData.getAll('assigneeIds') as string[]
@@ -41,6 +41,11 @@ export async function createWork(formData: FormData) {
 
   if (!name || !description) return { success: false, error: 'Missing required fields' }
 
+  // Validate selected creator is not an Admin
+  const creatorUser = await prisma.user.findUnique({ where: { id: creatorId } })
+  if (!creatorUser) return { success: false, error: 'Selected creator not found' }
+  if (creatorUser.role === 'ADMIN') return { success: false, error: 'Admins cannot participate in ideas / cannot be set as creator' }
+
   let dueDate: Date | null = null
   if (dueDateStr) {
     try {
@@ -56,7 +61,7 @@ export async function createWork(formData: FormData) {
         status,
         priority,
         dueDate,
-        creatorId: user.id,
+        creatorId: creatorId,
         parentWorkId: parentWorkId || null,
         assignees: {
           connect: assigneeIdsRaw.filter(Boolean).map(id => ({ id }))
@@ -89,6 +94,8 @@ export async function createWork(formData: FormData) {
     
     revalidatePath('/')
     revalidatePath('/works')
+    revalidatePath('/proposals')
+    revalidatePath('/members')
     return { success: true }
   } catch (error: any) {
     console.error('Failed to create work:', error)
@@ -158,6 +165,7 @@ export async function editWork(id: string, formData: FormData) {
     revalidatePath('/')
     revalidatePath('/works')
     revalidatePath('/proposals')
+    revalidatePath('/members')
     return { success: true }
   } catch (error: any) {
     console.error('Failed to edit work:', error)
@@ -165,7 +173,7 @@ export async function editWork(id: string, formData: FormData) {
   }
 }
 
-export async function updateWorkStatus(id: string, newStatus: string, blockedReason?: string) {
+export async function updateWorkStatus(id: string, newStatus: string, blockedReason?: string, actualDurationHours?: number) {
   const session = await getSession()
   if (!session) return { success: false, error: 'Unauthorized' }
   const user = session.user
@@ -186,60 +194,54 @@ export async function updateWorkStatus(id: string, newStatus: string, blockedRea
 
     const isEditedByAdmin = user.role === 'ADMIN' && work.creatorId !== user.id
 
-    // Update status and blockedReason if BLOCKED/DELETED
+    const updateData: any = {
+      status: newStatus,
+      blockedReason: (newStatus === 'BLOCKED' || newStatus === 'DELETED') ? (blockedReason || 'No reason provided') : null,
+      ...(isEditedByAdmin && {
+        originalOwnerId: work.creatorId,
+        editedByAdminId: user.id,
+        editReason: `Status changed to ${newStatus} by admin`,
+      })
+    }
+
+    if (newStatus === 'ACTIVE' && !work.startedAt) {
+      updateData.startedAt = new Date()
+    }
+
+    if (newStatus === 'BLOCKED') {
+      updateData.lastBlockedAt = new Date()
+    } else if (work.lastBlockedAt) {
+      const blockedHours = (new Date().getTime() - new Date(work.lastBlockedAt).getTime()) / (1000 * 60 * 60)
+      updateData.totalBlockedHours = (work.totalBlockedHours || 0) + blockedHours
+      updateData.lastBlockedAt = null
+    }
+
+    if (newStatus === 'COMPLETED') {
+      updateData.completedAt = new Date()
+      if (actualDurationHours !== undefined) {
+        updateData.actualDurationHours = actualDurationHours
+      }
+    }
+
+    // Revert points if soft-deleting OR changing from completed/archived to a non-completed state
+    const isOldCompleted = work.status === 'COMPLETED' || work.status === 'ARCHIVED'
+    const isNewCompleted = newStatus === 'COMPLETED' || newStatus === 'ARCHIVED'
+    
+    if (newStatus === 'DELETED') {
+      await revertPointsForWork(id)
+    } else if (isOldCompleted && !isNewCompleted) {
+      await revertPointsForWork(id)
+    }
+
+    // Update work status and dates
     await prisma.work.update({
       where: { id },
-      data: { 
-        status: newStatus,
-        blockedReason: (newStatus === 'BLOCKED' || newStatus === 'DELETED') ? (blockedReason || 'No reason provided') : null,
-        ...(isEditedByAdmin && {
-          originalOwnerId: work.creatorId,
-          editedByAdminId: user.id,
-          editReason: `Status changed to ${newStatus} by admin`,
-        })
-      },
+      data: updateData,
     })
 
     // Award Points if completed and idea points haven't been awarded yet
-    if (newStatus === 'COMPLETED' && !work.ideaPointsAwarded) {
-      if (work.parentWorkId) {
-        await prisma.user.update({
-          where: { id: work.creatorId },
-          data: { totalPoints: { increment: 10 } }
-        })
-        await prisma.pointTransaction.create({
-          data: { amount: 10, reason: 'WORK_MENTION', userId: work.creatorId, workId: work.id }
-        })
-      }
-
-      for (const mention of work.personMentions) {
-        if (!mention.pointsAwarded) {
-          await prisma.personMention.update({
-            where: { id: mention.id },
-            data: { pointsAwarded: true }
-          })
-          await prisma.user.update({
-            where: { id: mention.userId },
-            data: { totalPoints: { increment: 10 } }
-          })
-          await prisma.pointTransaction.create({
-            data: { amount: 10, reason: 'PERSON_MENTION', userId: mention.userId, workId: work.id }
-          })
-          await prisma.notification.create({
-            data: {
-              title: 'Idea Completed! Points Awarded!',
-              message: `The idea "${work.name}" you were mentioned in has been completed. You received 10 points!`,
-              type: 'INFO',
-              userId: mention.userId
-            }
-          })
-        }
-      }
-
-      await prisma.work.update({
-        where: { id },
-        data: { ideaPointsAwarded: true }
-      })
+    if (newStatus === 'COMPLETED') {
+      await awardPointsForWork(id, actualDurationHours)
     }
 
     // Log the action
@@ -251,6 +253,8 @@ export async function updateWorkStatus(id: string, newStatus: string, blockedRea
     
     revalidatePath('/')
     revalidatePath('/works')
+    revalidatePath('/proposals')
+    revalidatePath('/members')
     return { success: true }
   } catch (error: any) {
     console.error('Failed to update work:', error)
@@ -289,8 +293,8 @@ export async function getWorks() {
   try {
     const data = await prisma.work.findMany({
       include: {
-        creator: { select: { id: true, name: true, profilePhoto: true, role: true } },
-        assignees: { select: { id: true, name: true, profilePhoto: true, role: true } },
+        creator: { select: { id: true, name: true, profilePhoto: true, role: true, customRole: true } },
+        assignees: { select: { id: true, name: true, profilePhoto: true, role: true, customRole: true } },
         editedByAdmin: { select: { name: true } },
         workUpdates: {
           include: {
@@ -337,12 +341,13 @@ export async function logWorkTime(workId: string, hours: number) {
     const work = await prisma.work.findUnique({ where: { id: workId } })
     if (!work) return { success: false, error: 'Work not found' }
     
-    // Calculate points (1h=1pt, 2h=2pt, 4h=5pt)
+    // Calculate points (1h=1pt, 2h=2pt, 4h=5pt, capped at 5pts per 24 hours)
     let points = 0;
     if (user.role !== 'NEUTRAL') {
-      if (hours >= 4) points = 5;
-      else if (hours >= 2) points = 2;
-      else if (hours >= 1) points = 1;
+      const pointsDays = Math.floor(hours / 24)
+      const pointsHours = hours % 24
+      const extraPoints = pointsHours >= 4 ? 5 : pointsHours >= 2 ? 2 : pointsHours >= 1 ? 1 : 0
+      points = (pointsDays * 5) + extraPoints
     }
     
     if (points > 0) {
@@ -431,25 +436,25 @@ export async function getIdeasWithSupports() {
         status: { in: ['IDEA', 'QUEUED', 'DECLINED', 'SHELVED', 'DELETED'] }
       },
       include: {
-        creator: { select: { id: true, name: true, profilePhoto: true, role: true } },
-        assignees: { select: { id: true, name: true, profilePhoto: true, role: true } },
+        creator: { select: { id: true, name: true, profilePhoto: true, role: true, customRole: true } },
+        assignees: { select: { id: true, name: true, profilePhoto: true, role: true, customRole: true } },
         personMentions: {
           include: {
-            user: { select: { id: true, name: true, profilePhoto: true, role: true } }
+            user: { select: { id: true, name: true, profilePhoto: true, role: true, customRole: true } }
           }
         },
         supports: {
           include: {
-            user: { select: { id: true, name: true, profilePhoto: true, role: true } }
+            user: { select: { id: true, name: true, profilePhoto: true, role: true, customRole: true } }
           },
           orderBy: { createdAt: 'desc' }
         },
         disagrees: {
           include: {
-            user: { select: { id: true, name: true, profilePhoto: true, role: true } },
+            user: { select: { id: true, name: true, profilePhoto: true, role: true, customRole: true } },
             replies: {
               include: {
-                user: { select: { id: true, name: true, profilePhoto: true, role: true } }
+                user: { select: { id: true, name: true, profilePhoto: true, role: true, customRole: true } }
               },
               orderBy: { createdAt: 'asc' }
             }
@@ -458,7 +463,7 @@ export async function getIdeasWithSupports() {
         },
         activityLogs: {
           include: {
-            user: { select: { id: true, name: true, profilePhoto: true, role: true } }
+            user: { select: { id: true, name: true, profilePhoto: true, role: true, customRole: true } }
           },
           orderBy: { createdAt: 'desc' },
           take: 10
@@ -717,6 +722,147 @@ export async function reviveIdea(workId: string) {
   }
 }
 
+export async function revertPointsForWork(workId: string) {
+  // Find all point transactions associated with this work
+  const transactions = await prisma.pointTransaction.findMany({
+    where: { workId }
+  })
+
+  // Deduct those points from the respective users
+  for (const tx of transactions) {
+    await prisma.user.update({
+      where: { id: tx.userId },
+      data: { totalPoints: { decrement: tx.amount } }
+    }).catch(() => {})
+  }
+
+  // Delete the point transactions so they don't bloat the ledger
+  await prisma.pointTransaction.deleteMany({
+    where: { workId }
+  })
+
+  // Reset person mentions pointsAwarded to false
+  await prisma.personMention.updateMany({
+    where: { workId },
+    data: { pointsAwarded: false }
+  }).catch(() => {})
+
+  // Reset work's ideaPointsAwarded to false
+  await prisma.work.update({
+    where: { id: workId },
+    data: { ideaPointsAwarded: false }
+  }).catch(() => {})
+}
+
+export async function awardPointsForWork(workId: string, actualDurationHours?: number) {
+  const work = await prisma.work.findUnique({
+    where: { id: workId },
+    include: {
+      creator: true,
+      assignees: true,
+      personMentions: true,
+    }
+  })
+  if (!work || work.ideaPointsAwarded) return
+
+  // 1. Award base effort points to the assignees (or creator if unassigned)
+  const actualHoursVal = actualDurationHours !== undefined ? actualDurationHours : (work.actualDurationHours || 0)
+  const pointsDays = Math.floor(actualHoursVal / 24)
+  const pointsHours = actualHoursVal % 24
+  const extraPoints = pointsHours >= 4 ? 5 : pointsHours >= 2 ? 2 : pointsHours >= 1 ? 1 : 0
+  const pointsToAward = (pointsDays * 5) + extraPoints
+
+  if (pointsToAward > 0) {
+    const receivers = work.assignees.length > 0 ? work.assignees : [work.creator]
+    for (const receiver of receivers) {
+      await prisma.user.update({
+        where: { id: receiver.id },
+        data: { totalPoints: { increment: pointsToAward } }
+      })
+      await prisma.pointTransaction.create({
+        data: { amount: pointsToAward, reason: 'WORK_COMPLETED', userId: receiver.id, workId: work.id }
+      })
+      await prisma.notification.create({
+        data: {
+          title: 'Work Completed! Points Awarded!',
+          message: `The work "${work.name}" has been completed. You received ${pointsToAward} points for your effort!`,
+          type: 'INFO',
+          userId: receiver.id
+        }
+      })
+    }
+  }
+
+  // 2. Award Idea specific points (if it's a subtask or is a standalone IDEA)
+  let creatorReceivedIdeaPoints = false
+  if (work.parentWorkId) {
+    await prisma.user.update({
+      where: { id: work.creatorId },
+      data: { totalPoints: { increment: 10 } }
+    })
+    await prisma.pointTransaction.create({
+      data: { amount: 10, reason: 'WORK_MENTION', userId: work.creatorId, workId: work.id }
+    })
+    creatorReceivedIdeaPoints = true
+  } else if (work.type === 'IDEA') {
+    await prisma.user.update({
+      where: { id: work.creatorId },
+      data: { totalPoints: { increment: 10 } }
+    })
+    await prisma.pointTransaction.create({
+      data: { amount: 10, reason: 'IDEA_CREATOR', userId: work.creatorId, workId: work.id }
+    })
+    await prisma.notification.create({
+      data: {
+        title: 'Idea Completed! Points Awarded!',
+        message: `The idea "${work.name}" you created has been completed. You received 10 points!`,
+        type: 'INFO',
+        userId: work.creatorId
+      }
+    })
+    creatorReceivedIdeaPoints = true
+  }
+
+  // 3. Award points for mentioned users
+  for (const mention of work.personMentions) {
+    // If the mentioned user is the creator and they already received points, skip to prevent double points
+    if (mention.userId === work.creatorId && creatorReceivedIdeaPoints) {
+      await prisma.personMention.update({
+        where: { id: mention.id },
+        data: { pointsAwarded: true }
+      })
+      continue
+    }
+
+    if (!mention.pointsAwarded) {
+      await prisma.personMention.update({
+        where: { id: mention.id },
+        data: { pointsAwarded: true }
+      })
+      await prisma.user.update({
+        where: { id: mention.userId },
+        data: { totalPoints: { increment: 10 } }
+      })
+      await prisma.pointTransaction.create({
+        data: { amount: 10, reason: 'PERSON_MENTION', userId: mention.userId, workId: work.id }
+      })
+      await prisma.notification.create({
+        data: {
+          title: 'Idea Completed! Points Awarded!',
+          message: `The idea "${work.name}" you were mentioned in has been completed. You received 10 points!`,
+          type: 'INFO',
+          userId: mention.userId
+        }
+      })
+    }
+  }
+
+  await prisma.work.update({
+    where: { id: work.id },
+    data: { ideaPointsAwarded: true }
+  })
+}
+
 export async function deleteIdea(workId: string) {
   const session = await getSession()
   if (!session) return { success: false, error: 'Unauthorized' }
@@ -734,6 +880,8 @@ export async function deleteIdea(workId: string) {
     }
 
     // Soft delete: set status to 'DELETED'
+    await revertPointsForWork(workId)
+
     await prisma.work.update({
       where: { id: workId },
       data: { status: 'DELETED' }
@@ -879,5 +1027,36 @@ export async function convertIdeaToWork(workId: string, formData: FormData) {
     return { success: true }
   } catch(error: any) {
     return { success: false, error: error.message }
+  }
+}
+
+export async function permanentlyDeleteWork(id: string) {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Unauthorized' }
+  const user = session.user
+
+  try {
+    const work = await prisma.work.findUnique({ where: { id } })
+    if (!work) return { success: false, error: 'Work not found' }
+
+    // Only Admin or Creator can permanently delete
+    const isAuthorized = user.role === 'ADMIN' || work.creatorId === user.id
+    if (!isAuthorized) {
+      return { success: false, error: 'You are not authorized to permanently delete this item.' }
+    }
+
+    // Deduct and delete point transactions, reset work settings
+    await revertPointsForWork(id)
+
+    await prisma.work.delete({ where: { id } })
+
+    revalidatePath('/')
+    revalidatePath('/works')
+    revalidatePath('/proposals')
+    revalidatePath('/members')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to permanently delete work:', error)
+    return { success: false, error: `Database error: ${error.message || error}` }
   }
 }

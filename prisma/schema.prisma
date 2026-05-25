@@ -27,6 +27,7 @@ model User {
   username          String   @unique
   passwordHash      String
   role              Role     @default(MEMBER)
+  customRole        String?
   profilePhoto      String?
   totalPoints       Int      @default(0)
   lastActive        DateTime? @default(now())
@@ -60,6 +61,7 @@ model Work {
   id              String   @id @default(cuid())
   name            String
   description     String   @db.Text
+  type            String   @default("IDEA") // IDEA or ACTION
   status          String   @default("IDEA") // IDEA, ACTIVE, BLOCKED, COMPLETED, ARCHIVED
   priority        String   @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
   dueDate         DateTime?
@@ -81,6 +83,11 @@ model Work {
   editReason      String?  @db.Text
 
   expectedDurationHours Int?
+  actualDurationHours   Float?
+  completedAt           DateTime?
+  startedAt             DateTime?
+  lastBlockedAt         DateTime?
+  totalBlockedHours     Float    @default(0)
   ideaPointsAwarded Boolean @default(false)
 
   supports        IdeaSupport[]
@@ -165,13 +172,16 @@ model TypingState {
 }
 
 model WorkUpdate {
-  id        String   @id @default(cuid())
-  content   String   @db.Text
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workId    String
-  work      Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+  id            String    @id @default(cuid())
+  content       String    @db.Text
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workId        String
+  work          Work      @relation(fields: [workId], references: [id], onDelete: Cascade)
+  startedAt     DateTime?
+  endedAt       DateTime?
+  durationHours Float?
+  createdAt     DateTime  @default(now())
 }
 
 model IdeaSupport {
@@ -269,15 +279,16 @@ model PersonMention {
 }
 
 model TimeLog {
-  id        String   @id @default(cuid())
-  hours     Int
-  points    Int
+  id            String   @id @default(cuid())
+  hours         Int
+  points        Int
+  pendingPoints Int      @default(0)
   
-  workId    String
-  work      Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
+  workId        String
+  work          Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
   
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  createdAt DateTime @default(now())
+  createdAt     DateTime @default(now())
 }
