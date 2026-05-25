@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
+import prisma from '@/lib/prisma'
 
 const secretKey = process.env.JWT_SECRET || 'super-secret-infofriyends-key-123'
 const key = new TextEncoder().encode(secretKey)
@@ -53,7 +54,22 @@ export async function getSession() {
   const session = cookieStore.get('session')?.value
   if (!session) return null
   try {
-    return await decrypt(session)
+    const decrypted = await decrypt(session)
+    if (decrypted && decrypted.user && process.env.DATABASE_URL) {
+      try {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: decrypted.user.id },
+          select: { customRole: true, profilePhoto: true }
+        })
+        if (dbUser) {
+          decrypted.user.customRole = dbUser.customRole
+          decrypted.user.profilePhoto = dbUser.profilePhoto
+        }
+      } catch (dbError) {
+        console.error('Error fetching user for session:', dbError)
+      }
+    }
+    return decrypted
   } catch (error) {
     return null
   }
