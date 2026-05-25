@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import { ShieldAlert, ArrowRight, Activity, Loader2, Eye, EyeOff } from 'lucide-react'
+import { ShieldAlert, ArrowRight, Activity, Loader2, Eye, EyeOff, Terminal } from 'lucide-react'
 import { loginAction } from '@/app/actions/auth'
 
 export default function LoginClient() {
@@ -126,40 +126,81 @@ export default function LoginClient() {
         </motion.div>
       </div>
 
-      {/* Holographic scanner redirect overlay to prevent feeling of freeze/hang */}
+      {/* User-friendly dashboard preview loader to prevent feeling of freeze/hang */}
       {isRedirecting && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#09090b]/90 backdrop-blur-xl"
+          className="fixed inset-0 z-50 bg-[#09090b] overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8 pt-6"
         >
-          <div className="relative flex flex-col items-center space-y-6">
-            {/* Holographic Glowing Scanner Outer Ring */}
-            <div className="relative w-24 h-24 flex items-center justify-center">
-              <div className="absolute inset-0 rounded-full border-2 border-[#63BDF2]/10" />
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                className="absolute inset-0 rounded-full border-2 border-t-[#63BDF2] border-r-transparent border-b-transparent border-l-transparent"
-              />
-              <motion.div
-                animate={{ rotate: -360 }}
-                transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-                className="absolute w-18 h-18 rounded-full border border-b-[#3188DA] border-t-transparent border-r-transparent border-l-transparent"
-              />
-              <Activity className="text-[#63BDF2] animate-pulse" size={32} />
+          {/* Background Skeleton Page */}
+          <div className="w-full max-w-[1960px] mx-auto space-y-8 pb-20 select-none animate-pulse opacity-40 pointer-events-none">
+            {/* Header Banner Skeleton */}
+            <div className="relative overflow-hidden rounded-3xl border border-white/5 bg-[#0d0e12] p-6 md:p-8">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="space-y-3 flex-1">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/5 text-[10px] font-bold text-muted-foreground uppercase">
+                    <Terminal size={12} /> Live Workspace
+                  </div>
+                  <div className="h-9 md:h-12 w-80 bg-white/5 rounded-2xl" />
+                  <div className="h-4 w-full md:w-3/4 bg-white/5 rounded-lg" />
+                </div>
+              </div>
             </div>
-            
-            {/* Text HUD */}
-            <div className="text-center space-y-2 select-none">
-              <h2 className="text-md font-black text-white uppercase tracking-[0.25em] animate-pulse">
-                Access Granted
-              </h2>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center justify-center gap-1.5">
-                <Loader2 size={12} className="animate-spin text-[#63BDF2]" />
-                Initializing Brain OS...
-              </p>
+
+            {/* Metrics Bar Skeleton */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="relative overflow-hidden p-5 rounded-2xl border border-white/5 bg-[#0d0e12]">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="h-4 w-20 bg-white/5" />
+                    <div className="w-8 h-8 rounded-xl bg-white/5" />
+                  </div>
+                  <div className="h-7 w-12 bg-white/5 rounded-lg" />
+                </div>
+              ))}
             </div>
+
+            {/* Main Layout Grid Skeleton */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              <div className="lg:col-span-8 space-y-8">
+                <div className="bg-[#0d0e12] border border-white/5 rounded-3xl p-6 space-y-6">
+                  <div className="h-6 w-48 bg-white/5 rounded-lg" />
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="p-6 rounded-3xl border border-white/10 bg-[#09090b] h-40" />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Premium Glassmorphic Centered Loader */}
+          <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[2px]">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="bg-[#0d0e12]/80 border border-white/10 rounded-3xl p-8 max-w-xs w-full shadow-2xl backdrop-blur-md text-center space-y-5 flex flex-col items-center"
+            >
+              <div className="relative w-16 h-16 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full border-2 border-[#63BDF2]/10" />
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                  className="absolute inset-0 rounded-full border-2 border-t-[#63BDF2] border-r-transparent border-b-transparent border-l-transparent"
+                />
+                <Activity className="text-[#63BDF2] animate-pulse" size={24} />
+              </div>
+              
+              <div className="space-y-1">
+                <h3 className="text-sm font-black text-white uppercase tracking-wider">Access Granted</h3>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center justify-center gap-1">
+                  <Loader2 size={10} className="animate-spin text-[#63BDF2]" /> Initializing OS...
+                </p>
+              </div>
+            </motion.div>
           </div>
         </motion.div>
       )}
