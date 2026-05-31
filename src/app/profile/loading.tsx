@@ -2,7 +2,7 @@ import { User, Award, FolderGit2 } from 'lucide-react'
 
 export default function ProfileLoading() {
   return (
-    <div className="space-y-8 pb-20 max-w-[1960px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 select-none animate-pulse">
+    <div className="space-y-6 md:space-y-8 pb-20 w-full px-4 sm:px-6 lg:px-12 pt-4 md:pt-6 animate-pulse select-none">
       
       {/* Header Banner Skeleton */}
       <div className="relative overflow-hidden rounded-3xl border border-white/5 bg-[#0d0e12] p-6 md:p-8">

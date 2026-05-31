@@ -1,6 +1,6 @@
 export default function ChatLoading() {
   return (
-    <div className="h-full w-full max-w-[1960px] mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col overflow-hidden select-none animate-pulse">
+    <div className="h-full w-full px-4 sm:px-6 lg:px-12 py-4 md:py-6 flex flex-col overflow-hidden select-none animate-pulse">
       <div className="flex-1 flex bg-[#0c0d12]/40 border border-white/10 rounded-3xl overflow-hidden backdrop-blur-xl h-full shadow-2xl relative">
         
         {/* Sidebar Skeleton */}
