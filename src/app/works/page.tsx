@@ -4,7 +4,7 @@ import WorkWall from '@/components/WorkWall'
 import { Briefcase } from 'lucide-react'
 import { Suspense } from 'react'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 // --- WORK WALL STREAMING SECTION ---
 async function WorkWallSection({ session }: { session: any }) {

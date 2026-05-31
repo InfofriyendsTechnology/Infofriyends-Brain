@@ -1,4 +1,4 @@
-import { getWorks, getCommunityPosts, getIdeasWithSupports } from '@/app/actions'
+import { getWorks, getCommunityPosts, getIdeasWithSupports, getWorksLite } from '@/app/actions'
 import { getMembers } from '@/app/actions/admin'
 import { getSession } from '@/lib/auth'
 import MemberLeaderboard from '@/components/MemberLeaderboard'
@@ -11,27 +11,18 @@ import { Suspense } from 'react'
 import LiveClock from '@/components/LiveClock'
 import AdminHomeClient from '@/components/AdminHomeClient'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
-// --- 1. METRICS STREAMING SECTION ---
-async function MetricsSection() {
-  let works: any[] = []
-  let posts: any[] = []
-  let members: any[] = []
-  try {
-    works = await getWorks()
-    posts = await getCommunityPosts()
-    members = await getMembers()
-  } catch (e) {}
-
+// --- 1. METRICS SECTION (data passed as props — no extra DB call) ---
+function MetricsSection({ works, posts, members }: { works: any[], posts: any[], members: any[] }) {
   const activeWorksCount = works.filter(w => w.status === 'Active' || w.status === 'ACTIVE').length
   const completedWorksCount = works.filter(w => w.status === 'Completed' || w.status === 'COMPLETED').length
   const totalPostsCount = posts.length
 
   return (
-    <DashboardMetrics 
-      activeWorks={activeWorksCount} 
-      completedWorks={completedWorksCount} 
+    <DashboardMetrics
+      activeWorks={activeWorksCount}
+      completedWorks={completedWorksCount}
       totalPosts={totalPostsCount}
       members={members.map((m: any) => ({
         id: m.id,
@@ -66,13 +57,8 @@ function MetricsSkeleton() {
   )
 }
 
-// --- 2. ACTIVE PROJECTS STREAMING SECTION ---
-async function ActiveProjectsSection({ currentUser }: { currentUser: any }) {
-  let works: any[] = []
-  try {
-    works = await getWorks()
-  } catch (e) {}
-
+// --- 2. ACTIVE PROJECTS SECTION (data passed as props) ---
+function ActiveProjectsSection({ works, currentUser }: { works: any[], currentUser: any }) {
   const activeWorks = works.filter(w => w.status === 'Active' || w.status === 'ACTIVE')
   const activeWorksPreview = activeWorks.slice(0, 3)
 
@@ -83,7 +69,6 @@ async function ActiveProjectsSection({ currentUser }: { currentUser: any }) {
           <WorkCard key={work.id} work={work} currentUser={currentUser} />
         ))}
       </div>
-
       {activeWorksPreview.length === 0 && (
         <div className="text-center py-12 text-muted-foreground text-sm">
           No active tasks. Approved proposals will appear here as active work.
@@ -123,13 +108,8 @@ function ActiveProjectsSkeleton() {
   )
 }
 
-// --- 3. LEADERBOARD STREAMING SECTION ---
-async function LeaderboardSection() {
-  let members: any[] = []
-  try {
-    members = await getMembers()
-  } catch (e) {}
-
+// --- 3. LEADERBOARD SECTION (data passed as props) ---
+function LeaderboardSection({ members }: { members: any[] }) {
   return <MemberLeaderboard members={members} limit={3} />
 }
 
@@ -157,20 +137,12 @@ function LeaderboardSkeleton() {
   )
 }
 
-// --- 4. PROPOSALS COMPACT PREVIEW (Read-Only) ---
-async function ProposalsPreviewSection() {
-  let ideas: any[] = []
-  let membersCount = 0
-  try {
-    ideas = await getIdeasWithSupports()
-    const members = await getMembers()
-    membersCount = members.length
-  } catch (e) {}
-
+// --- 4. PROPOSALS COMPACT PREVIEW (data passed as props) ---
+function ProposalsPreviewSection({ ideas, membersCount }: { ideas: any[], membersCount: number }) {
   const openIdeas = ideas.filter(f => f.status === 'IDEA')
   const queuedIdeas = ideas.filter(f => f.status === 'QUEUED')
   const declinedIdeas = ideas.filter(f => f.status === 'DECLINED')
-  const topIdeas = openIdeas.slice(0, 3) // Show top 3 open proposals
+  const topIdeas = openIdeas.slice(0, 3)
 
   return (
     <div className="space-y-5">
@@ -237,7 +209,7 @@ async function ProposalsPreviewSection() {
       )}
 
       {/* Go to Proposals Link */}
-      <Link 
+      <Link
         href="/proposals"
         className="flex items-center justify-center gap-1.5 text-xs font-bold text-yellow-400 hover:text-yellow-300 bg-yellow-400/5 border border-yellow-400/10 hover:border-yellow-400/20 px-4 py-2.5 rounded-xl transition-all group"
       >
@@ -267,18 +239,26 @@ function ProposalsPreviewSkeleton() {
   )
 }
 
-// --- MAIN DYNAMIC COMPONENT ---
+// --- MAIN PAGE — fetch everything once, in parallel ---
 export default async function Home() {
-  const session = await getSession()
+  // Parallel fetch: session + all data at the same time
+  const [session, works, members, posts, ideas] = await Promise.all([
+    getSession(),
+    getWorksLite(),
+    getMembers(),
+    getCommunityPosts(),
+    getIdeasWithSupports(),
+  ])
 
   if (session?.user?.role === 'ADMIN') {
-    const members = await getMembers()
-    const works = await getWorks()
     return <AdminHomeClient session={session} members={members} works={works} />
   }
 
+  const membersCount = members.filter((m: any) => m.role !== 'ADMIN').length
+
   return (
-    <div className="space-y-6 md:space-y-8 pb-20 w-full px-4 sm:px-6 lg:px-12 pt-4 md:pt-6">      {/* Header Banner (Instant Render) */}
+    <div className="space-y-6 md:space-y-8 pb-20 w-full px-4 sm:px-6 lg:px-12 pt-4 md:pt-6">
+      {/* Header Banner (Instant Render) */}
       <div className="relative overflow-hidden rounded-2xl md:rounded-3xl border border-border/40 bg-gradient-to-br from-secondary/15 via-background to-secondary/10 p-4 sm:p-5 md:p-8 backdrop-blur-xl">
         <div className="absolute top-0 right-0 w-80 h-80 bg-[#63BDF2]/10 rounded-full blur-[100px] pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-60 h-60 bg-[#3188DA]/5 rounded-full blur-[80px] pointer-events-none" />
@@ -295,7 +275,7 @@ export default async function Home() {
               Collaborate asynchronously, record updates instantly, and push community products forward without pressure.
             </p>
           </div>
-          
+
           <div className="flex flex-col md:items-end gap-2.5 select-none shrink-0">
             <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 px-3 py-1.5 rounded-full">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -306,23 +286,21 @@ export default async function Home() {
         </div>
       </div>
 
-      {/* Metrics Bar */}
-      <Suspense fallback={<MetricsSkeleton />}>
-        <MetricsSection />
-      </Suspense>
+      {/* Metrics Bar — instant, no Suspense needed (data already loaded) */}
+      <MetricsSection works={works} posts={posts} members={members} />
 
-      {/* Active Workspace — FULL WIDTH */}
+      {/* Active Workspace */}
       <div className="bg-secondary/10 border border-border/30 rounded-2xl md:rounded-3xl p-4 sm:p-5 md:p-6 backdrop-blur-xl space-y-4 md:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 md:pb-4 border-b border-border/30">
           <div className="flex items-center gap-2">
             <Briefcase className="text-primary" size={20} />
             <h2 className="text-lg font-bold text-white tracking-tight">Active Workspace</h2>
-            <SectionGuide 
+            <SectionGuide
               title="Active Workspace"
               content="Shows the currently active tasks. These are work items converted from approved proposals after full team consensus. Click a card to see its full timeline."
             />
           </div>
-          <Link 
+          <Link
             href="/works"
             className="flex items-center gap-1.5 text-xs font-bold text-primary hover:underline group shrink-0"
           >
@@ -330,34 +308,28 @@ export default async function Home() {
           </Link>
         </div>
 
-        <Suspense fallback={<ActiveProjectsSkeleton />}>
-          <ActiveProjectsSection currentUser={session?.user} />
-        </Suspense>
+        <ActiveProjectsSection works={works} currentUser={session?.user} />
       </div>
 
-      {/* Proposals + Leaderboard — SIDE BY SIDE */}
+      {/* Proposals + Leaderboard */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8 items-start">
-        {/* Proposals Compact Preview (Read-Only) */}
+        {/* Proposals Compact Preview */}
         <div className="bg-secondary/20 border border-yellow-400/10 rounded-2xl md:rounded-3xl p-4 sm:p-5 md:p-6 backdrop-blur-xl space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-border/30">
             <div className="flex items-center gap-2">
               <Lightbulb className="text-yellow-400" size={18} />
               <h3 className="text-sm font-bold text-white tracking-tight">Proposals</h3>
-              <SectionGuide 
+              <SectionGuide
                 title="Proposals Overview"
                 content="Read-only snapshot of current proposals. See how many ideas are open, queued, or declined. Click 'Open Proposals Hub' to vote, add new proposals, or manage the full lifecycle."
               />
             </div>
           </div>
-          <Suspense fallback={<ProposalsPreviewSkeleton />}>
-            <ProposalsPreviewSection />
-          </Suspense>
+          <ProposalsPreviewSection ideas={ideas} membersCount={membersCount} />
         </div>
 
         {/* Leaderboard */}
-        <Suspense fallback={<LeaderboardSkeleton />}>
-          <LeaderboardSection />
-        </Suspense>
+        <LeaderboardSection members={members} />
       </div>
     </div>
   )

@@ -5,17 +5,18 @@ import { Shield } from 'lucide-react'
 import { getMembers } from '@/app/actions/admin'
 import { getWorks } from '@/app/actions'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 10
 
 export default async function AdminPage() {
-  const session = await getSession()
-  
+  const [session, members, works] = await Promise.all([
+    getSession(),
+    getMembers(),
+    getWorks(),
+  ])
+
   if (!session || session.user.role !== 'ADMIN') {
     redirect('/')
   }
-
-  const members = await getMembers()
-  const works = await getWorks()
 
   return (
     <div className="space-y-8 pb-20 w-full px-4 sm:px-6 lg:px-12 pt-6">

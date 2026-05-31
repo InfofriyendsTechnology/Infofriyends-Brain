@@ -7,7 +7,7 @@ import EnvironmentLinks from '@/components/EnvironmentLinks'
 import { User, Award, Flame, FolderGit2 } from 'lucide-react'
 import { Suspense } from 'react'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 // --- 1. PROFILE FORM STREAMING SECTION ---
 async function ProfileFormSection({ session }: { session: any }) {

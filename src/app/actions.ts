@@ -323,9 +323,69 @@ export async function getWorks() {
       },
       orderBy: { createdAt: 'desc' },
     })
-    return JSON.parse(JSON.stringify(data))
+    return structuredClone(data)
   } catch (error) {
     console.error('Failed to fetch works:', error)
+    return []
+  }
+}
+
+// Lightweight version for dashboard — no heavy relations, much faster
+export async function getWorksLite() {
+  try {
+    const data = await prisma.work.findMany({
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        status: true,
+        priority: true,
+        dueDate: true,
+        createdAt: true,
+        updatedAt: true,
+        completedAt: true,
+        startedAt: true,
+        totalBlockedHours: true,
+        expectedDurationHours: true,
+        actualDurationHours: true,
+        parentWorkId: true,
+        blockedReason: true,
+        editReason: true,
+        creator: { select: { id: true, name: true, profilePhoto: true, role: true, customRole: true } },
+        assignees: { select: { id: true, name: true, profilePhoto: true, role: true, customRole: true } },
+        editedByAdmin: { select: { name: true } },
+        parentWork: { select: { id: true, name: true } },
+        personMentions: {
+          select: { id: true, userId: true, pointsAwarded: true,
+            user: { select: { id: true, name: true, profilePhoto: true } }
+          }
+        },
+        timeLogs: {
+          select: { id: true, hours: true, points: true, userId: true, createdAt: true,
+            user: { select: { id: true, name: true, profilePhoto: true } }
+          },
+          orderBy: { createdAt: 'desc' }
+        },
+        workUpdates: {
+          select: { id: true, content: true, createdAt: true,
+            user: { select: { name: true, profilePhoto: true } }
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 5
+        },
+        activityLogs: {
+          select: { id: true, action: true, details: true, createdAt: true,
+            user: { select: { name: true } }
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 5
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+    return structuredClone(data)
+  } catch (error) {
+    console.error('Failed to fetch works (lite):', error)
     return []
   }
 }
@@ -422,7 +482,7 @@ export async function getCommunityPosts() {
       },
       orderBy: { createdAt: 'desc' },
     })
-    return JSON.parse(JSON.stringify(data))
+    return structuredClone(data)
   } catch (error) {
     return []
   }
@@ -435,25 +495,30 @@ export async function getIdeasWithSupports() {
       where: {
         status: { in: ['IDEA', 'QUEUED', 'DECLINED', 'SHELVED', 'DELETED'] }
       },
+      take: 50,
       include: {
         creator: { select: { id: true, name: true, profilePhoto: true, role: true, customRole: true } },
         assignees: { select: { id: true, name: true, profilePhoto: true, role: true, customRole: true } },
         personMentions: {
-          include: {
+          select: {
+            id: true, userId: true, pointsAwarded: true,
             user: { select: { id: true, name: true, profilePhoto: true, role: true, customRole: true } }
           }
         },
         supports: {
-          include: {
+          select: {
+            id: true, userId: true, createdAt: true,
             user: { select: { id: true, name: true, profilePhoto: true, role: true, customRole: true } }
           },
           orderBy: { createdAt: 'desc' }
         },
         disagrees: {
-          include: {
+          select: {
+            id: true, reason: true, userId: true, createdAt: true,
             user: { select: { id: true, name: true, profilePhoto: true, role: true, customRole: true } },
             replies: {
-              include: {
+              select: {
+                id: true, content: true, userId: true, createdAt: true,
                 user: { select: { id: true, name: true, profilePhoto: true, role: true, customRole: true } }
               },
               orderBy: { createdAt: 'asc' }
@@ -462,19 +527,20 @@ export async function getIdeasWithSupports() {
           orderBy: { createdAt: 'desc' }
         },
         activityLogs: {
-          include: {
+          select: {
+            id: true, action: true, details: true, createdAt: true,
             user: { select: { id: true, name: true, profilePhoto: true, role: true, customRole: true } }
           },
           orderBy: { createdAt: 'desc' },
-          take: 10
+          take: 5
         }
       },
       orderBy: [
-        { priority: 'asc' }, // URGENT first
+        { priority: 'asc' },
         { createdAt: 'desc' }
       ],
     })
-    return JSON.parse(JSON.stringify(data))
+    return structuredClone(data)
   } catch (error) {
     console.error('Failed to get ideas with supports:', error)
     return []

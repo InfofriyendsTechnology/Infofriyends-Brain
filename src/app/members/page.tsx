@@ -5,23 +5,26 @@ import MemberActivityClient from '@/components/MemberActivityClient'
 import { Users } from 'lucide-react'
 import { Suspense } from 'react'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 async function MemberActivitySection() {
   let members: any[] = []
   let works: any[] = []
   const session = await getSession()
-  
+
   try {
-    members = await getMembers()
-    works = await getWorks()
+    // Parallel fetch — both at the same time
+    ;[members, works] = await Promise.all([
+      getMembers(),
+      getWorks(),
+    ])
   } catch (e) {}
 
   return (
-    <MemberActivityClient 
-      members={members} 
-      works={works} 
-      currentUserId={session?.user?.id} 
+    <MemberActivityClient
+      members={members}
+      works={works}
+      currentUserId={session?.user?.id}
       currentUserRole={session?.user?.role}
     />
   )

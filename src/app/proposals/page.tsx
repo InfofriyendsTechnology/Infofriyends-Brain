@@ -5,7 +5,7 @@ import IdeaAgreementHub from '@/components/IdeaAgreementHub'
 import { Lightbulb } from 'lucide-react'
 import { Suspense } from 'react'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 // --- PROPOSALS STREAMING SECTION ---
 async function ProposalsSection({ session }: { session: any }) {
@@ -14,17 +14,20 @@ async function ProposalsSection({ session }: { session: any }) {
   let works: any[] = []
   let membersCount = 0
   try {
-    ideas = await getIdeasWithSupports()
-    members = await getMembers()
-    works = await getWorks()
+    // Parallel fetch — all 3 at the same time
+    ;[ideas, members, works] = await Promise.all([
+      getIdeasWithSupports(),
+      getMembers(),
+      getWorks(),
+    ])
     membersCount = members.filter((m: any) => m.role !== 'ADMIN').length
   } catch (error) {}
 
   return (
-    <IdeaAgreementHub 
-      ideas={ideas} 
-      currentUser={session?.user} 
-      membersCount={membersCount} 
+    <IdeaAgreementHub
+      ideas={ideas}
+      currentUser={session?.user}
+      membersCount={membersCount}
       members={members}
       works={works}
     />

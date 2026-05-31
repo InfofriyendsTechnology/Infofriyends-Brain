@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
 import prisma from '@/lib/prisma'
+import { cache } from 'react'
 
 const secretKey = process.env.JWT_SECRET || 'super-secret-infofriyends-key-123'
 const key = new TextEncoder().encode(secretKey)
@@ -49,7 +50,9 @@ export async function logout() {
   cookieStore.set('session', '', { expires: new Date(0), path: '/' })
 }
 
-export async function getSession() {
+// Wrapped with React cache() — runs at most ONCE per request, no matter
+// how many server components call getSession() on the same page load.
+export const getSession = cache(async () => {
   const cookieStore = await cookies()
   const session = cookieStore.get('session')?.value
   if (!session) return null
@@ -73,4 +76,4 @@ export async function getSession() {
   } catch (error) {
     return null
   }
-}
+})
