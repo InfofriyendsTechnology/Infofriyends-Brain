@@ -5,7 +5,7 @@ import MemberLeaderboard from '@/components/MemberLeaderboard'
 import DashboardMetrics from '@/components/DashboardMetrics'
 import WorkCard from '@/components/WorkCard'
 import SectionGuide from '@/components/SectionGuide'
-import { Terminal, ArrowRight, Briefcase, Lightbulb, ListOrdered, XCircle, ThumbsUp, Clock } from 'lucide-react'
+import { Terminal, ArrowRight, Briefcase, Lightbulb, ListOrdered, XCircle, ThumbsUp, Clock, Crown, Users, CheckCircle2, Activity } from 'lucide-react'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import LiveClock from '@/components/LiveClock'
@@ -13,9 +13,55 @@ import AdminHomeClient from '@/components/AdminHomeClient'
 
 export const revalidate = 30
 
-// ─── SINGLE async data loader ────────────────────────────────────────────────
+// ─── ADMIN DATA COMPONENT ───────────────────────────────────────────────────
+async function AdminDashboardData({ session }: { session: any }) {
+  const [members, works] = await Promise.all([getMembers(), getWorks()])
+  return <AdminHomeClient session={session} members={members} works={works} />
+}
+
+// ─── ADMIN SKELETON ─────────────────────────────────────────────────────────
+function AdminHomeSkeleton({ session }: { session: any }) {
+  return (
+    <div className="w-full h-full p-4 sm:p-6 lg:p-12 space-y-8 select-none animate-pulse">
+      {/* Super Admin Crown Banner Skeleton */}
+      <div className="relative overflow-hidden rounded-3xl border border-[#3188DA]/30 bg-gradient-to-br from-[#1B2B3A] via-background to-[#0D1A26] p-8 md:p-12 backdrop-blur-xl">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#63BDF2]/10 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-72 h-72 bg-[#3188DA]/10 rounded-full blur-[100px] pointer-events-none" />
+
+        <div className="relative z-10 space-y-4">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#63BDF2]/10 border border-[#63BDF2]/20 text-xs font-bold text-[#63BDF2] uppercase tracking-widest shadow-[0_0_15px_rgba(99,189,242,0.15)]">
+            <Crown size={14} className="text-[#63BDF2]" /> 
+            Super Admin Access
+          </div>
+          <div className="h-12 md:h-16 w-64 md:w-96 bg-white/[0.06] rounded-2xl" />
+          <div className="h-5 w-full md:w-2/3 bg-white/[0.06] rounded-lg" />
+          <div className="h-5 w-1/2 bg-white/[0.06] rounded-lg" />
+        </div>
+      </div>
+
+      {/* Analytics Cards Skeleton */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="bg-zinc-950/50 border border-white/10 p-6 rounded-3xl shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <div className="h-4 w-24 bg-white/[0.06] rounded uppercase" />
+              <div className="w-10 h-10 rounded-2xl bg-white/[0.06]" />
+            </div>
+            <div className="h-10 w-16 bg-white/[0.06] rounded-xl" />
+          </div>
+        ))}
+      </div>
+      
+      {/* Informational Message Skeleton */}
+      <div className="p-6 bg-zinc-900/40 border border-white/5 rounded-3xl text-center flex justify-center">
+        <div className="h-4 w-3/4 max-w-md bg-white/[0.06] rounded" />
+      </div>
+    </div>
+  )
+}
+
+// ─── REGULAR USER DATA COMPONENT ─────────────────────────────────────────────
 // Fetches everything in ONE parallel Promise.all and renders all sections.
-// Wrapped in Suspense so the static shell above renders instantly.
 async function DashboardData({ currentUser }: { currentUser: any }) {
   const [works, members, posts, ideas] = await Promise.all([
     getWorksLite(),
@@ -165,7 +211,7 @@ async function DashboardData({ currentUser }: { currentUser: any }) {
   )
 }
 
-// ─── SKELETON for the data sections ──────────────────────────────────────────
+// ─── REGULAR USER SKELETON ──────────────────────────────────────────────────
 function DashboardSkeleton() {
   return (
     <div className="space-y-6 md:space-y-8 animate-pulse select-none">
@@ -239,16 +285,21 @@ function DashboardSkeleton() {
   )
 }
 
-// ─── MAIN PAGE ────────────────────────────────────────────────────────────────
+// ─── MAIN PAGE ENTRY ────────────────────────────────────────────────────────
 export default async function Home() {
-  // Only session is needed before rendering the shell — fast (cached)
+  // Only session is needed before deciding which shell to render — fast (cached)
   const session = await getSession()
 
+  // ── ADMIN VIEW ──
   if (session?.user?.role === 'ADMIN') {
-    const [members, works] = await Promise.all([getMembers(), getWorks()])
-    return <AdminHomeClient session={session} members={members} works={works} />
+    return (
+      <Suspense fallback={<AdminHomeSkeleton session={session} />}>
+        <AdminDashboardData session={session} />
+      </Suspense>
+    )
   }
 
+  // ── REGULAR USER VIEW ──
   return (
     <div className="space-y-6 md:space-y-8 pb-20 w-full px-4 sm:px-6 lg:px-12 pt-4 md:pt-6">
       {/* ── SHELL: renders instantly, no data needed ── */}
